@@ -17,7 +17,7 @@ class Card(Model):
     id: Identifier
     fields: dict[Short, Annotated[str, Field(max_length=20000)]] = Field(min_length=1,max_length=30)
     kind: Literal['cloze','basic','io'] = 'cloze'
-    notetype: Short = 'ColdRecall Cloze'
+    notetype: Short | None = None  # None: the server's profile supplies it on save
     deck: Short = 'Default'
     tags: list[Annotated[str, Field(min_length=1,max_length=200,pattern=r'^\S+$')]] = Field(default_factory=list,max_length=100)
     action: Literal['create','update'] = 'create'
@@ -33,7 +33,7 @@ class Card(Model):
     @model_validator(mode='after')
     def validate_note(self):
         if self.action == 'update' and self.note_id is None: raise ValueError('An update requires an existing note_id from Anki MCP.')
-        if ('\n' in self.deck or '\r' in self.deck or '\n' in self.notetype or '\r' in self.notetype): raise ValueError('Deck and notetype must be single-line.')
+        if ('\n' in self.deck or '\r' in self.deck or (self.notetype is not None and ('\n' in self.notetype or '\r' in self.notetype))): raise ValueError('Deck and notetype must be single-line.')
         if (self.question is None) != (self.answer is None): raise ValueError('Supply both question and answer HTML.')
         return self
 

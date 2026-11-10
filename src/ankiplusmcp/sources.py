@@ -118,8 +118,9 @@ class Sources:
     def resolve_target(self, filename='', course=None, number=None, title=None, subject=None, system=None, existing_decks=None, legacy=False):
         from cards import target
         if course is not None and number is not None and title:
-            result = dict(target.build(course,number,title,subject,system),confident=True)
-        else: result = target.parse(filename,subject,system)
+            result = dict(target.build(course,number,title,subject,system,self.profile.tag_root),confident=True)
+        else: result = target.parse(filename,subject,system,self.profile.tag_root)
+        result['note_type'] = self.profile.note_type
         if result.get('confident'):
             if legacy: result['deck']=f'{result["course"]}::{result["number"]}. {result["topic"]}'
             result['create_deck'] = result['deck'] not in (existing_decks or [])

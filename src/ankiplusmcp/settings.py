@@ -1,6 +1,8 @@
-"""Launch-time defaults: where workspaces live and which directories may be read."""
+"""Launch-time defaults: where workspaces live, which directories may be read, and the card profile."""
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
+import tomllib
 import platformdirs
 
 APP = 'ankiplusmcp'
@@ -28,3 +30,52 @@ def safe_cwd_root(cwd: Path, home: Path):
     if resolved == Path(resolved.anchor) or resolved == Path(home).resolve():
         return None
     return cwd
+
+
+@dataclass(frozen=True)
+class Profile:
+    """The conventions a deployment uses when a card or target does not state its own."""
+    name: str
+    note_type: str
+    tag_root: str
+
+
+PROFILES = {
+    'default': Profile('default', 'Cloze', '#AnkiPlus'),
+    'coldrecall': Profile('coldrecall', 'ColdRecall Cloze', '#ColdRecall'),
+}
+CONFIG_ENV = 'ANKIPLUS_CONFIG'
+CONFIG_KEYS = {'profile', 'note_type', 'tag_root'}
+
+
+def default_config_path() -> Path:
+    return platformdirs.user_config_path(APP) / 'config.toml'
+
+
+def _named(name):
+    if name not in PROFILES:
+        raise ValueError(f'Unknown profile {name!r}; choose one of {", ".join(sorted(PROFILES))}.')
+    return PROFILES[name]
+
+
+def load_profile(profile_flag, config_path, env) -> Profile:
+    """A --profile flag wins outright; otherwise the config file; otherwise the default profile."""
+    if profile_flag:
+        return _named(profile_flag)
+    explicit = config_path or (Path(env[CONFIG_ENV]) if env.get(CONFIG_ENV) else None)
+    path = explicit or default_config_path()
+    if not Path(path).is_file():
+        if explicit:
+            raise ValueError(f'Config file not found: {explicit}')
+        return PROFILES['default']
+    try:
+        data = tomllib.loads(Path(path).read_text(encoding='utf-8'))
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f'Config file {path} is not valid TOML: {exc}') from exc
+    unknown = sorted(set(data) - CONFIG_KEYS)
+    if unknown:
+        raise ValueError(f'Unknown config key {unknown[0]!r} in {path}; allowed: {", ".join(sorted(CONFIG_KEYS))}.')
+    overrides = {key: data[key] for key in ('note_type', 'tag_root') if key in data}
+    if any(not isinstance(value, str) or not value.strip() for value in overrides.values()):
+        raise ValueError(f'note_type and tag_root in {path} must be non-empty text.')
+    return replace(_named(data.get('profile', 'default')), **overrides)

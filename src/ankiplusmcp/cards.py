@@ -20,6 +20,8 @@ class Cards:
     def save_cards(self, workspace, cards, expected_revision):
         if not 1 <= len(cards) <= 500: raise DomainError('LIMIT','Save between 1 and 500 cards.')
         parsed = [Card.model_validate(c).model_dump() for c in cards]
+        for card in parsed:
+            if card['notetype'] is None: card['notetype'] = self.profile.note_type
         if len({c['id'] for c in parsed}) != len(parsed): raise DomainError('CARD','Duplicate card IDs.')
         with self.store.edit(workspace,expected_revision) as state:
             for card in parsed:

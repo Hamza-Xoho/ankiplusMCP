@@ -39,6 +39,7 @@ class API:
                 'guidance_topics':['overview','quality','maintainer','student'],
                 'source_roots':[str(p) for p in (self.s.store.source_roots or ())],
                 'source_roots_origin':self.s.store.source_roots_origin,
+                'profile':{'name':self.s.profile.name,'note_type':self.s.profile.note_type,'tag_root':self.s.profile.tag_root},
                 'long_operations':'extract_source, ocr_image and render_cards return jobs; use get_job.',
                 'missing_dependency_remedy':'Install the project dependencies, tesseract-ocr and run python -m playwright install chromium.'}
 
