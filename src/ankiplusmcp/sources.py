@@ -6,6 +6,7 @@ import uuid
 from cards.common.paths import Build
 from cards.common.source_data import selection
 from .store import DomainError, digest
+from . import doctor
 
 class Sources:
     def engine(self, workspace):
@@ -41,7 +42,11 @@ class Sources:
                                     raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
                 prefix=f'extractions/{uuid.uuid4().hex}/engine'
                 self.store.write_json(workspace,prefix+'/build.json',{'source':{'path':str(path),'sha256':state['source']['sha256'],'kind':'pdf' if path.suffix=='.pdf' else 'text'}})
-                extract.run(SimpleNamespace(build=str(self.store.path(workspace,prefix)), slides=slides))
+                try: extract.run(SimpleNamespace(build=str(self.store.path(workspace,prefix)), slides=slides))
+                except Exception as exc:
+                    # The extractor reports a missing OCR program as its own E24; name the fix instead.
+                    if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
+                    raise
                 if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
                 data = self.store.read_json(workspace,prefix+'/source/slides.json')
                 state['source_engine']=prefix
@@ -87,6 +92,7 @@ class Sources:
         return {'artifact':artifact}
 
     def ocr_image(self, workspace, artifact, min_conf=20, min_len=2, group=True, pad=.004):
+        doctor.require('tesseract')
         self.image_bytes(workspace,artifact)  # verify image and size before OCR
         def run(cancel):
             from cards.extract.ocr import extract

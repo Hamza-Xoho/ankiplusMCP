@@ -5,7 +5,6 @@ import importlib.metadata
 import inspect
 import json
 from pathlib import Path
-import shutil
 from typing import Annotated, Literal
 from urllib.parse import unquote, urlparse
 import anyio
@@ -16,7 +15,7 @@ from cards.common.errors import CardsError
 from .models import Card, Region, Finding, ExternalResult
 from .store import DomainError
 from .service import Service
-from . import settings
+from . import settings, doctor
 
 Workspace = Annotated[str, Field(pattern=r'^[A-Za-z0-9_-]{1,80}$')]
 Offset = Annotated[int, Field(ge=0)]
@@ -30,18 +29,18 @@ class API:
     def capabilities(self) -> dict:
         """Inspect supported helpers, installed prerequisites and the separate Anki MCP dependency."""
         dependencies={}
-        for name in ('mcp','PyMuPDF','pillow','playwright','pytesseract'):
+        for name in ('mcp','PyMuPDF','pillow','playwright'):
             try: dependencies[name]=importlib.metadata.version(name)
             except importlib.metadata.PackageNotFoundError: dependencies[name]=None
         return {'server':'ankiplusmcp','version':importlib.metadata.version('ankiplusmcp'),'transport':'stdio',
                 'anki_connection':'separate_host_dependency','anki_operations':False,
-                'dependencies':dependencies,'tesseract_available':bool(shutil.which('tesseract')),
+                'dependencies':dependencies,'tesseract_available':doctor.have('tesseract'),'chromium_available':doctor.have('chromium'),
                 'guidance_topics':['overview','quality','maintainer','student'],
                 'source_roots':[str(p) for p in (self.s.store.source_roots or ())],
                 'source_roots_origin':self.s.store.source_roots_origin,
                 'profile':{'name':self.s.profile.name,'note_type':self.s.profile.note_type,'tag_root':self.s.profile.tag_root},
                 'long_operations':'extract_source, ocr_image and render_cards return jobs; use get_job.',
-                'missing_dependency_remedy':'Install the project dependencies, tesseract-ocr and run python -m playwright install chromium.'}
+                'missing_dependency_remedy':doctor.FIXES}
 
     def get_guidance(self, topic: Literal['overview','quality','maintainer','student']='overview') -> dict:
         """Read optional workflow examples or card/reviewer guidance. No prescribed tool sequence."""

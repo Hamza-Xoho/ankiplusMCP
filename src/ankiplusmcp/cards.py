@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import uuid
 from .models import Card
 from .store import DomainError, digest
+from . import doctor
 
 class Cards:
     def _cards(self, workspace):
@@ -75,6 +76,7 @@ class Cards:
                 'source_accuracy_verified':False}
 
     def render_cards(self, workspace, ids=None, front=None, back=None, css=None, per_sheet=8, desktop_sample=0, light=False):
+        doctor.require('chromium')
         with self.store.lock(workspace):
             selected=self._select(workspace,ids)
             if not selected: raise DomainError('CARD','No cards to render.','Save cards first.')

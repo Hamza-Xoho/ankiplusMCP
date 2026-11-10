@@ -58,13 +58,9 @@ numpy==2.5.4
 onnxruntime==1.31.1
     # via pymupdf
 packaging==26.3
-    # via
-    #   onnxruntime
-    #   pytesseract
+    # via onnxruntime
 pillow==13.0.0
-    # via
-    #   ankiplusmcp
-    #   pytesseract
+    # via ankiplusmcp
 platformdirs==4.14.5
     # via ankiplusmcp
 playwright==1.65.0
@@ -99,8 +95,6 @@ pymupdf4llm==2.1
     # via
     #   pymupdf
     #   pymupdf-layout
-pytesseract==0.3.13
-    # via ankiplusmcp
 python-dotenv==1.2.4
     # via pydantic-settings
 python-multipart==0.0.33

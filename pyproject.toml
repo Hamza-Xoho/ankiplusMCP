@@ -12,7 +12,9 @@ license = {text = "MIT"}
 dependencies = ["mcp~=1.30", "pydantic~=2.14", "PyMuPDF~=2.1", "pillow~=13.0", "numpy~=2.5", "platformdirs>=4.2", "filelock>=3.13"]
 
 [project.optional-dependencies]
-ocr = ["pytesseract~=0.3.13"]
+# OCR runs the system `tesseract` program directly, so it needs no Python package.
+# The extra is kept so `ankiplusmcp[ocr]` stays a valid install target.
+ocr = []
 render = ["playwright~=1.64"]
 all = ["ankiplusmcp[ocr,render]"]
 dev = ["ankiplusmcp[all]", "pytest>=8", "build"]
