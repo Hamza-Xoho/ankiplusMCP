@@ -46,17 +46,20 @@ jobs:
       - name: Install Tesseract (macOS)
         if: runner.os == 'macOS'
         run: brew install tesseract
+      # The frozen contract tests run the CLI as .venv/bin/cards, the path the
+      # skill documents, so the package is installed into a .venv in the checkout.
       - name: Install package
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e '.[dev]'
-          python -m playwright install --with-deps chromium
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -e '.[dev]'
+          .venv/bin/python -m playwright install --with-deps chromium
       - name: Unit tests
-        run: python -m pytest -q tests/unit
+        run: .venv/bin/python -m pytest -q tests/unit
       - name: MCP tools and stdio integration
-        run: python -m pytest -q tests/mcp
+        run: .venv/bin/python -m pytest -q tests/mcp
       - name: Contract tests
-        run: python -m pytest -q tests/contract
+        run: .venv/bin/python -m pytest -q tests/contract
 
   launcher:
     strategy:
