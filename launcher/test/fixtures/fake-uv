@@ -1,0 +1,8 @@
+#!/bin/sh
+# Test double for `uv`: records its arguments and plays back what the test asks for.
+if [ -n "${FAKE_UV_LOG:-}" ]; then
+  for a in "$@"; do printf '%s\n' "$a" >> "$FAKE_UV_LOG"; done
+fi
+if [ -n "${FAKE_UV_STDOUT:-}" ]; then printf '%s' "$FAKE_UV_STDOUT"; fi
+if [ -n "${FAKE_UV_STDERR:-}" ]; then printf '%s' "$FAKE_UV_STDERR" >&2; fi
+exit "${FAKE_UV_EXIT:-0}"

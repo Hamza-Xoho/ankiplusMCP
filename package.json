@@ -1,0 +1,25 @@
+{
+  "name": "ankiplusmcp",
+  "version": "0.2.0",
+  "description": "One-command launcher and installer for the AnkiPlus MCP server (Python, run through uv)",
+  "type": "module",
+  "bin": {
+    "ankiplusmcp": "launcher/cli.mjs"
+  },
+  "files": [
+    "launcher/cli.mjs",
+    "launcher/lib",
+    "skills/ankiplusmcp",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test launcher/test/*.test.mjs"
+  },
+  "keywords": ["mcp", "anki", "flashcards", "model-context-protocol"],
+  "license": "MIT",
+  "repository": "github:Hamza-Xoho/ankiplusMCP"
+}
