@@ -6,13 +6,14 @@ following --command, for example --command /path/to/venv/bin/ankiplusmcp ...
 """
 import argparse
 import asyncio
+import os
 import sys
 import tempfile
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 async def smoke(command):
-    async with stdio_client(StdioServerParameters(command=command[0],args=command[1:])) as (read,write):
+    async with stdio_client(StdioServerParameters(command=command[0],args=command[1:],env=dict(os.environ))) as (read,write):
         async with ClientSession(read,write) as session:
             await session.initialize()
             listed=await session.list_tools()
