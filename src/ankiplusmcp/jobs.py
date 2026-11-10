@@ -1,16 +1,16 @@
 """Persistent, cancellable jobs; owner leases distinguish restart from concurrency."""
 from concurrent.futures import ThreadPoolExecutor
-import fcntl
-from pathlib import Path
 import uuid
+from filelock import FileLock, Timeout
 from .store import DomainError
 
 class Jobs:
     def __init__(self, store, workers=2):
         self.store = store
         self.owner = uuid.uuid4().hex
-        self.lease = (store.root/f'.owner-{self.owner}.lock').open('a')
-        fcntl.flock(self.lease, fcntl.LOCK_EX)
+        self.lease_path = store.root/f'.owner-{self.owner}.lock'
+        self.lease = FileLock(self.lease_path)
+        self.lease.acquire()
         self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='ankiplus')
 
     def submit(self, workspace, operation, callback):
@@ -51,11 +51,12 @@ class Jobs:
             lease_path = self.store.root/f'.owner-{record["owner"]}.lock'
             if not lease_path.exists(): alive = False
             else:
-                with lease_path.open('a') as lease:
-                    try:
-                        fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                        alive = False
-                    except BlockingIOError: alive = True
+                probe = FileLock(lease_path)
+                try:
+                    probe.acquire(timeout=0)
+                    probe.release()
+                    alive = False
+                except Timeout: alive = True
             if not alive:
                 record = self._update(workspace, ident, status='interrupted', progress='owner stopped; retry explicitly')
         return record
@@ -68,4 +69,5 @@ class Jobs:
 
     def close(self):
         self.pool.shutdown(wait=True, cancel_futures=False)
-        self.lease.close()
+        self.lease.release()
+        self.lease_path.unlink(missing_ok=True)

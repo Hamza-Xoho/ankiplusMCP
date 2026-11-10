@@ -1,12 +1,12 @@
 """Workspace containment, atomic persistence and cross-process revisions."""
 from contextlib import contextmanager
-import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import uuid
+from filelock import FileLock
 from cards.common.files import _write
 
 MAX_FILE = 64 * 1024 * 1024
@@ -69,11 +69,9 @@ class Store:
 
     @contextmanager
     def lock(self, ident, name='workspace'):
-        path = self.path(ident, f'.{name}.lock')
-        with path.open('a') as handle:
-            fcntl.flock(handle, fcntl.LOCK_EX)
-            try: yield
-            finally: fcntl.flock(handle, fcntl.LOCK_UN)
+        # A new FileLock per call: two threads in one process must still exclude each other.
+        with FileLock(self.path(ident, f'.{name}.lock')):
+            yield
 
     @contextmanager
     def edit(self, ident, expected_revision=None):
