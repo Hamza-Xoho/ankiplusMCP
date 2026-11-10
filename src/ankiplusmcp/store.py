@@ -25,7 +25,15 @@ class Store:
     def __init__(self, root, source_roots):
         self.root = Path(root).expanduser().resolve()
         self.root.mkdir(parents=True, exist_ok=True)
-        self.source_roots = tuple(Path(p).expanduser().resolve() for p in source_roots)
+        # None means "not resolved yet": the server asks the client on the first tool call.
+        self.source_roots = None
+        self.source_roots_origin = 'unresolved'
+        if source_roots is not None:
+            self.set_source_roots(source_roots, 'flags')
+
+    def set_source_roots(self, paths, origin):
+        self.source_roots = tuple(Path(p).expanduser().resolve() for p in paths)
+        self.source_roots_origin = origin
 
     def directory(self, ident):
         if not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', ident):
@@ -52,7 +60,10 @@ class Store:
         if not raw.is_absolute():
             raise DomainError('SOURCE', 'Source path must be absolute.')
         resolved = raw.resolve()
-        if not any(resolved.is_relative_to(root) for root in self.source_roots):
+        roots = self.source_roots or ()
+        if not roots:
+            raise DomainError('SOURCE', 'No readable source roots are configured.', 'Launch with --source-root <directory> or set ANKIPLUS_SOURCE_ROOTS.')
+        if not any(resolved.is_relative_to(root) for root in roots):
             raise DomainError('SOURCE', 'Source is outside configured readable roots.', 'Launch with --source-root for the intended directory.')
         if not resolved.is_file() or resolved.stat().st_size > MAX_FILE:
             raise DomainError('SOURCE', 'Source missing or larger than 64 MiB.')

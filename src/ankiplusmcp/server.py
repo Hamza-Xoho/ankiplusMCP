@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import shutil
 from typing import Annotated, Literal
+from urllib.parse import unquote, urlparse
 import anyio
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ImageContent, ToolAnnotations
@@ -15,6 +16,7 @@ from cards.common.errors import CardsError
 from .models import Card, Region, Finding, ExternalResult
 from .store import DomainError
 from .service import Service
+from . import settings
 
 Workspace = Annotated[str, Field(pattern=r'^[A-Za-z0-9_-]{1,80}$')]
 Offset = Annotated[int, Field(ge=0)]
@@ -35,7 +37,8 @@ class API:
                 'anki_connection':'separate_host_dependency','anki_operations':False,
                 'dependencies':dependencies,'tesseract_available':bool(shutil.which('tesseract')),
                 'guidance_topics':['overview','quality','maintainer','student'],
-                'source_roots':[str(p) for p in self.s.store.source_roots],
+                'source_roots':[str(p) for p in (self.s.store.source_roots or ())],
+                'source_roots_origin':self.s.store.source_roots_origin,
                 'long_operations':'extract_source, ocr_image and render_cards return jobs; use get_job.',
                 'missing_dependency_remedy':'Install the project dependencies, tesseract-ocr and run python -m playwright install chromium.'}
 
@@ -194,6 +197,23 @@ class API:
         return self.s.jobs.cancel(workspace,job_id)
 
 
+async def resolve_roots(server, store):
+    """Settle unresolved source roots: folders the client offers, else a safe working directory, else none."""
+    roots=[]
+    try:
+        session=server.get_context().session
+        if session.client_params and session.client_params.capabilities.roots is not None:
+            with anyio.move_on_after(5):
+                listed=await session.list_roots()
+                roots=[Path(unquote(urlparse(str(r.uri)).path)) for r in listed.roots if str(r.uri).startswith('file://')]
+    except Exception:  # a client that cannot answer simply offers no roots
+        roots=[]
+    if roots:
+        store.set_source_roots(roots,'client'); return
+    fallback=settings.safe_cwd_root(Path.cwd(),Path.home())
+    store.set_source_roots([fallback] if fallback else [],'cwd' if fallback else 'none')
+
+
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
     read_only={'capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job'}
@@ -203,6 +223,7 @@ def create_server(service):
             @wraps(method)
             async def invoke(**kwargs):
                 try:
+                    if service.store.source_roots is None: await resolve_roots(server,service.store)
                     result=await anyio.to_thread.run_sync(lambda: method(**kwargs))
                     if isinstance(result,CallToolResult): return result
                     encoded=json.dumps(result,ensure_ascii=False,allow_nan=False)
