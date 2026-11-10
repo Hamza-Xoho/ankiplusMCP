@@ -29,6 +29,10 @@ Collection search, note retrieval, media storage in Anki, additions, updates and
 suspension/unsuspension remain in the separately configured official Anki MCP.
 A request needing only those operations need not call AnkiPlus.
 
+Install and host registration are handled by the npm launcher (`npx ankiplusmcp init`,
+`doctor`, `setup`, `uninstall`); see the README. `capabilities` also reports the active
+profile, where the source roots came from, and whether Tesseract and Chromium are present.
+
 Scope limits: local stdio only, at most 500 source pages and 500 cards per workspace,
 64 MiB input files, 20 million decoded image pixels. Long native operations cancel
 at safe boundaries. Remote HTTP/authentication and legacy-build migration are

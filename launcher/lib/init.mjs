@@ -103,7 +103,7 @@ function evaluate(change, { force, previous, io }) {
   if (change.kind === 'command') {
     if (previous?.some((done) => done.kind === 'command' && sameValue(done.argv, change.argv))) return { status: 'unchanged' };
     if (io.exec(change.exists).status !== 0) return { status: 'planned' };
-    return force ? { status: 'planned', replaces: true } : { status: 'refused', why: `the host already has a ${SERVER} server; --force replaces it` };
+    return force ? { status: 'planned', replaces: true } : { status: 'refused', why: `the host already has an ${SERVER} server; --force replaces it` };
   }
   if (!existsSync(change.to)) return { status: 'planned' };
   if (sameDir(change.from, change.to)) return { status: 'unchanged' };

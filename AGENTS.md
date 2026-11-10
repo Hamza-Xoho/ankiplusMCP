@@ -2,6 +2,9 @@
 
 The new product is `ankiplusmcp`, implemented in `src/ankiplusmcp/`.
 Run `./scripts/check-mcp.sh`; use `python -m ankiplusmcp` for stdio.
+The npm launcher (`npx ankiplusmcp`: serve, init, doctor, setup, uninstall) is in
+`launcher/`, dependency-free; run `npm test`. Keep `package.json` and
+`pyproject.toml` on the same version. Design: `docs/superpowers/specs/2026-11-10-npx-launcher-design.md`.
 The official Anki MCP is a separate host dependency. Do not add Anki connection,
 proxy or collection mutation code. Keep the host model in control of workflows.
 Use `tests/mcp/` for new MCP tests. Keep `src/cards/`, frozen contract tests,
