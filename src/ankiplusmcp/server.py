@@ -31,7 +31,7 @@ class API:
         for name in ('mcp','PyMuPDF','pillow','playwright','pytesseract'):
             try: dependencies[name]=importlib.metadata.version(name)
             except importlib.metadata.PackageNotFoundError: dependencies[name]=None
-        return {'server':'ankiplusmcp','version':'0.1.0','transport':'stdio',
+        return {'server':'ankiplusmcp','version':importlib.metadata.version('ankiplusmcp'),'transport':'stdio',
                 'anki_connection':'separate_host_dependency','anki_operations':False,
                 'dependencies':dependencies,'tesseract_available':bool(shutil.which('tesseract')),
                 'guidance_topics':['overview','quality','maintainer','student'],
