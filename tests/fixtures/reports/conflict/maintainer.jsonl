@@ -1,0 +1,2 @@
+{"type": "note", "note_id": "n001", "card": null, "verdict": "fix", "codes": ["A3"], "blocker": true, "evidence": "article leak", "rewrite": {"Text": "Correct {{c1::answer}}", "Extra": "unchanged"}, "reviewer": "maintainer"}
+{"type": "summary", "reviewer": "maintainer", "verdict": "PASS_WITH_FIXES", "stats": {}}

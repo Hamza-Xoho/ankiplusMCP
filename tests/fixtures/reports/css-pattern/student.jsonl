@@ -1,0 +1,4 @@
+{"type": "note", "note_id": "n001", "card": null, "verdict": "fix", "codes": ["V6"], "blocker": true, "evidence": "same overflow", "rewrite": {"Text": "Correct {{c1::answer}}", "Extra": "unchanged"}, "attempt": {"answer": "x", "result": "right"}, "reviewer": "student"}
+{"type": "note", "note_id": "n002", "card": null, "verdict": "fix", "codes": ["V6"], "blocker": true, "evidence": "same overflow", "rewrite": {"Text": "Correct {{c1::answer}}", "Extra": "unchanged"}, "attempt": {"answer": "x", "result": "right"}, "reviewer": "student"}
+{"type": "note", "note_id": "n003", "card": null, "verdict": "fix", "codes": ["V6"], "blocker": true, "evidence": "same overflow", "rewrite": {"Text": "Correct {{c1::answer}}", "Extra": "unchanged"}, "attempt": {"answer": "x", "result": "right"}, "reviewer": "student"}
+{"type": "summary", "reviewer": "student", "verdict": "PASS_WITH_FIXES", "stats": {}}

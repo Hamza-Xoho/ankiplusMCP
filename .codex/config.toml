@@ -1,0 +1,18 @@
+# Project Codex config for the anki-v2 build (this repository).
+# Loads only after you trust this project in Codex (HANDOVER, Setup step 4).
+# T3 Code's model picker and permission mode override the first four keys per thread;
+# keep T3 on GPT-6.1 Sol, reasoning High, permission mode "Auto" (never "Full access").
+
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+sandbox_mode = "workspace-write"     # makes .codex/, .agents/ and .git read-only for the agent
+approval_policy = "on-request"
+
+[sandbox_workspace_write]
+network_access = false               # dependency installs ask first; the cards CLI never needs network
+
+[agents]
+max_concurrent_threads_per_session = 3
+
+[features]
+hooks = true                         # the guardrails in .codex/hooks.json

@@ -1,0 +1,21 @@
+# Reserved configuration for v1.1. The v1.0 CLI still pins these defaults in
+# code, so editing this file does not change behaviour yet.
+tag_root = "#ColdRecall"
+note_type = "ColdRecall Cloze"
+per_sheet = 8
+student_all_sheets_max_pairs = 6
+max_review_rounds = 2
+self_review_max_changed = 8
+stdout_max_lines = 40
+stdout_max_chars = 2000
+deck_name_max_chars = 100
+anki_url = "http://127.0.0.1:3141/"
+
+[lint]
+max_underlines = 3
+max_cloze_numbers = 5
+max_extra_lines = 3
+max_extra_chars = 200
+max_text_chars = 200
+max_bold_runs = 4
+max_hint_chars = 20

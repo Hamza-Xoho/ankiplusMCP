@@ -1,0 +1,60 @@
+/* ColdRecall Cloze — look cloned from the AnKing MCAT note type (AnKingMed), trimmed to what own cards use */
+html { font-size: 28px; }
+.mobile { font-size: 28px; }
+.card, kbd { font-family: Menlo, baskerville, sans; }
+.card {
+  text-align: center; font-size: 1rem; height: 100%; flex-grow: 1;
+  margin: 15px 15px 0; padding-bottom: 1em;
+  color: #D7DEE9; background-color: #333B45;
+}
+.nightMode.card, .night_mode .card { color: #D7DEE9 !important; background-color: #333B45 !important; }
+.mobile .card { padding-bottom: 5em; margin: 1ex .3px; }
+
+.cloze { font-weight: bold; color: MediumSeaGreen; }
+.nightMode .cloze, .night_mode .cloze { color: MediumSeaGreen !important; }
+
+b { color: #C695C6 !important; }
+u { color: #5EB3B3 !important; }
+i { color: IndianRed !important; }
+/* the revealed answer always reads as the answer, even when bold/underlined inside the cloze */
+.cloze b, .cloze u, .cloze i { color: inherit !important; }
+
+hr { opacity: .7; }
+
+/* review-panel fixes: phone gutter, answer shape, scannable Extra, unbreakable formulas */
+#text, #extra { padding: 0 14px; box-sizing: border-box; }
+.cloze { background: rgba(60,179,113,.16); border-radius: 6px; padding: 0 .15em; }
+#extra { display: block; text-align: left; max-width: 100%; }
+#extra .src { font-size: .7rem; opacity: .8; font-style: normal; margin-top: .5em; }
+.nw { white-space: nowrap; }
+
+#extra { color: #839496; font-style: italic; font-size: 1rem; }
+.nightMode #extra, .night_mode #extra { color: #839496; }
+
+img { max-width: 85%; max-height: 100%; }
+#extra img { max-width: 85% !important; min-width: 30%; }
+.mobile .card img, .mobile #extra img { max-width: 100% !important; }
+
+ul, ol { padding-left: 40px; max-width: 50%; margin-left: auto; margin-right: auto; text-align: left; }
+ul ul, ol ol { max-width: 100%; margin-left: 0; margin-right: 0; }
+.mobile ul, .mobile ol { max-width: 100%; }
+.mnemonics { display: inline-block; text-align: left; }
+
+table {
+  margin-left: auto; margin-right: auto; border-collapse: collapse; overflow: scroll;
+  white-space: normal; font-style: normal; font-size: clamp(0.1rem, 1.7vw, 0.9rem) !important; max-width: 95vw;
+  color: #000; border: 1px solid #a4cde0; background-color: #fff;
+}
+table span { font-size: clamp(0.1rem, 1.7vw, 0.9rem) !important; }
+table tr, td, th { padding: clamp(0.05rem, 1vw, 1rem); }
+table td:first-child { border-left: 1px solid white; }
+table td:last-child { border-right: 1px solid white; }
+table tr td:first-child[colspan]:last-child[colspan] { background-color: #fff; color: #367390; border-top: 3px solid #367390; border-bottom: 3px solid #367390; }
+table th { background-color: #ddecf2; color: #266988; border: 1px solid #fff; font-weight: normal; }
+table tr:nth-child(even) { color: #000; background-color: #f8f8f8; }
+.nightMode table, .night_mode table { color: #fff; border: 1px solid #393743; background-color: #26252b; }
+.nightMode table th, .night_mode table th { background-color: #19181d; color: #3086ae; border: 1px solid #393743; }
+.nightMode table tr:nth-child(even), .night_mode table tr:nth-child(even) { color: #fff; background-color: #2e2e36; }
+.nightMode tr td:first-child[colspan]:last-child[colspan], .night_mode tr td:first-child[colspan]:last-child[colspan] { background-color: #19181d; color: #4491b6; border-top: 3px solid #393743; border-bottom: 3px solid #393743; }
+.nightMode table td:first-child, .night_mode table td:first-child { border-left: 1px solid black; }
+.nightMode table td:last-child, .night_mode table td:last-child { border-right: 1px solid black; }

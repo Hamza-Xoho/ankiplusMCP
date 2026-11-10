@@ -1,0 +1,139 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__anki__find_notes",
+      "mcp__anki__notes_info",
+      "mcp__anki__cards_stats",
+      "mcp__anki__list_decks",
+      "mcp__anki__model_names",
+      "mcp__anki__model_templates",
+      "mcp__anki__model_styling",
+      "mcp__anki__model_field_names",
+      "mcp__anki__present_card",
+      "mcp__anki__get_card_memory_state",
+      "mcp__anki__tag_list",
+      "mcp__anki__get_due_cards",
+      "Bash(.venv/bin/python:*)",
+      "Bash(.venv/bin/python3:*)",
+      "Bash(scripts/setup.sh:*)",
+      "Bash(.claude/skills/anki/scripts/*)",
+      "Edit(./**)",
+      "Write(./**)",
+      "mcp__anki__add_note",
+      "mcp__anki__add_notes",
+      "mcp__anki__update_notes",
+      "mcp__anki__update_note_fields",
+      "mcp__anki__create_deck",
+      "mcp__anki__card_suspend",
+      "mcp__anki__tag_add",
+      "mcp__anki__store_media_file",
+      "Bash(.venv/bin/cards:*)"
+    ],
+    "ask": [
+      "mcp__anki__delete_notes",
+      "mcp__anki__card_unsuspend",
+      "mcp__anki__tag_remove",
+      "mcp__anki__tag_replace",
+      "mcp__anki__tag_batch",
+      "mcp__anki__create_model",
+      "mcp__anki__update_model_styling",
+      "mcp__anki__update_model_templates",
+      "mcp__anki__model_field_add",
+      "mcp__anki__card_change_deck"
+    ],
+    "deny": [
+      "Write(.env)",
+      "Edit(.env)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "anki"
+  ],
+  "disableClaudeAiConnectors": true,
+  "claudeMdExcludes": [
+    "~/.claude/CLAUDE.md"
+  ],
+  "deniedMcpServers": [
+    {
+      "serverName": "Claude_Code_iOS_Simulator"
+    },
+    {
+      "serverName": "Control_Chrome"
+    },
+    {
+      "serverName": "Control_your_Mac"
+    },
+    {
+      "serverName": "Desktop_Commander"
+    },
+    {
+      "serverName": "Figma"
+    },
+    {
+      "serverName": "claude-flow"
+    },
+    {
+      "serverName": "claude-in-chrome"
+    },
+    {
+      "serverName": "flow-nexus"
+    },
+    {
+      "serverName": "mcp-registry"
+    },
+    {
+      "serverName": "ruv-swarm"
+    },
+    {
+      "serverName": "scheduled-tasks"
+    },
+    {
+      "serverName": "terminal"
+    }
+  ],
+  "enabledPlugins": {},
+  "model": "claude-sonnet-5-5",
+  "env": {
+    "CARDS_PDF_GUARD": "build"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" block_fork.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" block_pdf_read.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" block_local_http.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__anki__add_notes|mcp__anki__add_note|mcp__anki__update_note_fields|mcp__anki__update_notes",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/run.sh\" require_review_before_write.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Contract tests that need private lecture PDFs skip instead of failing
+      # in public CI. Local runs still fail loudly when a fixture is missing.
+      CARDS_PUBLIC_CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+          python -m playwright install --with-deps chromium
+      - name: Unit tests
+        run: python -m pytest -q tests/unit
+      - name: MCP tools and stdio integration
+        run: python -m pytest -q tests/mcp
+      - name: Contract tests
+        run: python -m pytest -q tests/contract
+
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Build wheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip wheel . --no-deps -w dist
+      - name: Install the wheel outside the checkout
+        run: |
+          python -m venv /tmp/cards-venv
+          /tmp/cards-venv/bin/pip install dist/ankiplusmcp-*.whl
+          /tmp/cards-venv/bin/python -c "from cards.review.packets import TEMPLATES; from cards.render import ASSETS; assert TEMPLATES.is_dir() and ASSETS.is_dir()"
+      - name: Smoke test isolated build
+        run: |
+          work="$(mktemp -d)"
+          cd "$work"
+          printf 'lecture\n' > MED241_L006_smoke.txt
+          /tmp/cards-venv/bin/cards state init "$work/MED241_L006_smoke.txt"
+          test -f "$work/builds"/*/build.json
+      - name: Refuse merged sources
+        run: |
+          work="$(mktemp -d)"
+          cd "$work"
+          printf 'lecture\n' > MED241_L029-L044_merged.txt
+          if /tmp/cards-venv/bin/cards state init "$work/MED241_L029-L044_merged.txt"; then
+            echo "merged source was accepted"; exit 1
+          fi

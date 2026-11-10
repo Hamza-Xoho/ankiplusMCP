@@ -1,0 +1,30 @@
+name: ankiplusmcp
+services:
+  mcp:
+    image: ankiplusmcp:${ANKIPLUS_REVISION:-development-dirty}
+    build:
+      context: .
+      args:
+        SOURCE_REVISION: ${ANKIPLUS_REVISION:-development-dirty}
+    stdin_open: true
+    tty: false
+    read_only: true
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 1.5
+    mem_limit: 1536m
+    pids_limit: 128
+    shm_size: 128m
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+    volumes:
+      - ankiplusmcp-workspaces:/workspaces
+      - ${ANKIPLUS_SOURCES:-./examples}:/sources:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: '2'
+volumes:
+  ankiplusmcp-workspaces:
