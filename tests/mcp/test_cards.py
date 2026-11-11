@@ -123,3 +123,24 @@ def test_house_style_uses_the_profile_tag_root(tmp_path):
     s.save_cards(w, [{**c, "tags": ["#Other::T"]}], 1)
     assert "L10" in {f["code"] for f in s.check_cards(w, house_style=True)["findings"]}
     s.close()
+
+
+def test_render_without_any_browser_fails_before_a_job(tmp_path, monkeypatch):
+    from ankiplusmcp import doctor
+    monkeypatch.setattr(doctor, 'have', lambda name: False)
+    monkeypatch.setattr(doctor, 'system_chrome', lambda: None)
+    s=Service(tmp_path/'work',[tmp_path],browser='chrome'); w=s.store.create('cards')['id']
+    s.save_cards(w,[card()],0)
+    with pytest.raises(DomainError) as e: s.render_cards(w)
+    assert e.value.code=='DEPENDENCY' and 'Chrome' in e.value.message
+    s.close()
+
+
+def test_render_with_system_chrome(tmp_path):
+    from ankiplusmcp import doctor
+    if not doctor.system_chrome(): pytest.skip('Google Chrome is not installed')
+    s=Service(tmp_path/'work',[tmp_path],browser='chrome'); w=s.store.create('cards')['id']
+    s.save_cards(w,[card()],0)
+    result=wait(s,w,s.render_cards(w))
+    assert s.image_bytes(w,result['sheets'][0]['fronts']).startswith(b'\x89PNG')
+    s.close()

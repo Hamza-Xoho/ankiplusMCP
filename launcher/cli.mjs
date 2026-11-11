@@ -20,7 +20,7 @@ const USAGE = `ankiplusmcp ${VERSION}
   npx ankiplusmcp setup [--yes]     Install Chromium for card previews.
   npx ankiplusmcp --version
 
-Server flags: --workspace-root DIR, --source-root DIR (repeatable), --profile NAME, --config FILE.
+Server flags: --workspace-root DIR, --source-root DIR (repeatable), --profile NAME, --config FILE, --browser VALUE (auto, chromium, chrome or a path).
 `;
 
 const env = process.env;

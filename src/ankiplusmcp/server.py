@@ -32,9 +32,10 @@ class API:
         for name in ('mcp','PyMuPDF','pillow','playwright'):
             try: dependencies[name]=importlib.metadata.version(name)
             except importlib.metadata.PackageNotFoundError: dependencies[name]=None
+        browser=doctor.resolve_browser(self.s.browser)
         return {'server':'ankiplusmcp','version':importlib.metadata.version('ankiplusmcp'),'transport':'stdio',
                 'anki_connection':'separate_host_dependency','anki_operations':False,
-                'dependencies':dependencies,'tesseract_available':doctor.have('tesseract'),'chromium_available':doctor.have('chromium'),
+                'dependencies':dependencies,'tesseract_available':doctor.have('tesseract'),'chromium_available':browser is not None,'browser':browser,
                 'guidance_topics':['overview','quality','maintainer','student'],
                 'source_roots':[str(p) for p in (self.s.store.source_roots or ())],
                 'source_roots_origin':self.s.store.source_roots_origin,

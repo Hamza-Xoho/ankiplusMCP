@@ -12,11 +12,11 @@ from .store import DomainError
 
 FIXES = {
     'tesseract': 'Install Tesseract: macOS `brew install tesseract`; Debian/Ubuntu `sudo apt-get install -y tesseract-ocr`.',
-    'chromium': 'Run `npx ankiplusmcp setup` (or `ankiplusmcp setup`) to install Chromium for previews.',
+    'chromium': 'Run `npx ankiplusmcp setup` (or `ankiplusmcp setup`) to install Chromium for previews, or install Google Chrome.',
 }
 MISSING = {
     'tesseract': 'OCR needs the Tesseract program, which was not found on PATH.',
-    'chromium': 'Card previews need Playwright and its Chromium browser, which are not installed.',
+    'chromium': 'Card previews need Playwright and a browser (its Chromium or Google Chrome), and none was found.',
 }
 PACKAGES = (('mcp', 'mcp'), ('pymupdf', 'PyMuPDF'), ('pillow', 'pillow'))
 _chromium_found = False
@@ -40,6 +40,52 @@ def have(name):
     raise ValueError(name)
 
 
+def system_chrome():
+    """The installed Google Chrome program, if any."""
+    candidates = [Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')]
+    for command in ('google-chrome', 'google-chrome-stable'):
+        found = shutil.which(command)
+        if found:
+            candidates.append(Path(found))
+    for variable in ('PROGRAMFILES', 'PROGRAMFILES(X86)', 'LOCALAPPDATA'):
+        base = os.environ.get(variable)
+        if base:
+            candidates.append(Path(base) / 'Google' / 'Chrome' / 'Application' / 'chrome.exe')
+    return next((p for p in candidates if p.is_file()), None)
+
+
+def resolve_browser(configured):
+    """The browser to use for `configured` (auto, chromium, chrome or a path): its name or path, else None."""
+    if configured == 'chromium':
+        return 'chromium' if have('chromium') else None
+    if configured == 'chrome':
+        return 'chrome' if system_chrome() else None
+    if configured == 'auto':
+        if have('chromium'):
+            return 'chromium'
+        return 'chrome' if system_chrome() else None
+    return configured if Path(configured).is_file() else None
+
+
+def require_browser(configured):
+    resolved = resolve_browser(configured)
+    if resolved is None:
+        asked = {'auto': 'Chromium or Google Chrome', 'chromium': "Playwright's Chromium", 'chrome': 'Google Chrome'}.get(configured, f'the browser at {configured}')
+        raise DomainError('DEPENDENCY', f'Card previews need {asked}, which was not found.',
+                          'Run `npx ankiplusmcp setup` to install Chromium, or install Google Chrome.')
+    return resolved
+
+
+def describe_browser(configured):
+    """(resolved, detail) for the doctor check."""
+    resolved = resolve_browser(configured)
+    if resolved == 'chromium':
+        return resolved, 'bundled Chromium'
+    if resolved == 'chrome':
+        return resolved, f'system Chrome at {system_chrome()}'
+    return resolved, (f'configured browser {resolved}' if resolved else MISSING['chromium'])
+
+
 def require(name):
     if not have(name):
         raise DomainError('DEPENDENCY', MISSING[name], FIXES[name])
@@ -56,7 +102,7 @@ def _writable(path):
     return False
 
 
-def run_checks(workspace_root):
+def run_checks(workspace_root, browser_setting='auto'):
     """One record per prerequisite: name, status ok|missing, required, detail, fix."""
     checks = []
 
@@ -73,9 +119,10 @@ def run_checks(workspace_root):
             add(name, False, True, 'not installed', 'Reinstall ankiplusmcp.')
     add('workspace_root', _writable(workspace_root), True, str(workspace_root),
         'Choose a writable directory with --workspace-root or ANKIPLUS_WORKSPACE_ROOT.')
-    for name in ('tesseract', 'chromium'):
-        found = have(name)
-        add(name, found, False, 'available' if found else MISSING[name], FIXES[name])
+    found = have('tesseract')
+    add('tesseract', found, False, 'available' if found else MISSING['tesseract'], FIXES['tesseract'])
+    browser, detail = describe_browser(browser_setting)
+    add('chromium', browser is not None, False, detail, FIXES['chromium'])
     return checks
 
 
@@ -84,8 +131,11 @@ def doctor_main(argv):
     parser = argparse.ArgumentParser(prog='ankiplusmcp doctor', description='Check what AnkiPlus MCP needs to run.')
     parser.add_argument('--json', action='store_true', help='Machine-readable output on stdout.')
     parser.add_argument('--workspace-root', default=os.environ.get('ANKIPLUS_WORKSPACE_ROOT') or str(settings.default_workspace_root()))
+    parser.add_argument('--browser', default=None, help='auto, chromium, chrome or a browser program path. Overrides the config file.')
     args = parser.parse_args(argv)
-    checks = run_checks(args.workspace_root)
+    try: browser = settings.load_browser(args.browser, None, os.environ)
+    except ValueError as exc: parser.error(str(exc))
+    checks = run_checks(args.workspace_root, browser)
     required_missing = any(c['status'] == 'missing' and c['required'] for c in checks)
     optional_missing = any(c['status'] == 'missing' and not c['required'] for c in checks)
     if args.json:
@@ -113,8 +163,9 @@ def setup_main(argv):
     say('Card previews use a Chromium browser that Playwright downloads into its own cache (roughly 150 MB or more).')
     say('OCR uses Tesseract, which this command cannot install. ' + FIXES['tesseract'])
     code = 0
-    if have('chromium'):
-        say('Chromium is already installed.')
+    browser, detail = describe_browser('auto')
+    if browser:
+        say(f'A browser for previews is already available ({detail}); nothing to download.')
     else:
         if not args.yes and input('Download Chromium now? [y/N] ').strip().lower() not in ('y', 'yes'):
             say('Nothing was downloaded.')
@@ -129,6 +180,7 @@ def setup_main(argv):
             code = subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], stdout=sys.stderr).returncode
     if args.json:
         tesseract = have('tesseract')
-        print(json.dumps({'chromium': {'installed': have('chromium')},
+        browser = resolve_browser('auto')
+        print(json.dumps({'browser': browser, 'chromium': {'installed': have('chromium')},
                           'tesseract': {'available': tesseract, 'fix': '' if tesseract else FIXES['tesseract']}}))
     return code

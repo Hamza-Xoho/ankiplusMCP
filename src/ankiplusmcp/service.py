@@ -10,9 +10,10 @@ from .payloads import Payloads
 from .settings import PROFILES
 
 class Service(Sources, Artifacts, Cards, Review, Payloads):
-    def __init__(self, root, source_roots, profile=None):
+    def __init__(self, root, source_roots, profile=None, browser='auto'):
         self.store = Store(root, source_roots)
         self.profile = profile or PROFILES['default']
+        self.browser = browser
         self.jobs = Jobs(self.store)
 
     def close(self):

@@ -75,7 +75,7 @@ class Cards:
                 'source_accuracy_verified':False}
 
     def render_cards(self, workspace, ids=None, front=None, back=None, css=None, per_sheet=8, desktop_sample=0, light=False):
-        doctor.require('chromium')
+        browser=doctor.require_browser(self.browser)
         with self.store.lock(workspace):
             selected=self._select(workspace,ids)
             if not selected: raise DomainError('CARD','No cards to render.','Save cards first.')
@@ -118,11 +118,11 @@ class Cards:
                 prefix=f'previews/{uuid.uuid4().hex}'
                 build=self.store.path(workspace,prefix); build.mkdir(parents=True)
                 self.store.write_json(workspace,prefix+'/input.json',rows)
-                sheets_abs=render.render_rows(rows,build,css=css,per_sheet=per_sheet,browser='chromium')
+                sheets_abs=render.render_rows(rows,build,css=css,per_sheet=per_sheet,browser=browser)
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
                 sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in sheets_abs]
                 from .variants import samples
-                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,'chromium')
+                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,browser)
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
                 result={'_committed':True,'samples':variants,'sheets':sheets,'cards_sha256':digest(self.store.path(workspace,'cards.json')),'selected_ids':[c['id'] for c in selected],'card_revision':revision,'prefix':prefix,'approximation': 'Local inert template rendering; custom Anki filters/add-on JavaScript are not executed.'}
                 self.store.write_json(workspace,'latest-preview.json',result)
