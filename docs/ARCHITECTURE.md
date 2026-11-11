@@ -139,9 +139,18 @@ The skill reads the map, then pulls only the slides it needs with
 model's context. Flagged slides that need a look get a page image
 (`--page-image N`), and only those images are opened.
 
-Cold extraction is the slow step: OCR and rendering dominate, and a 60-slide
-lecture can take minutes. The requirement is under 60 seconds, which is not met
-yet.
+Cold extraction is the slow step, and OCR dominates it. OCR runs on a thread
+pool (one worker per core by default) and remembers results by image content,
+so a repeat run skips it. Measured on a synthetic 12-page PDF with one 1400x900
+labelled figure per page (8 cores, Tesseract 5.5.4): rendering takes 0.08 s per
+figure; OCR takes 13.9 s per figure on one worker; a cold `extract_source` takes
+52.4 s; a repeat into a new folder with the same cache takes 1.2 s. These
+numbers are synthetic. `tests/tools/time_extract.py` reproduces them.
+
+The `cards` core is callable through typed functions such as
+`cards.extract.extract_source` and `cards.extract.ocr_figures`. The MCP server
+calls these directly. It does not build argument objects or write `build.json`
+to reach the core.
 
 ## 7. Drafting and checking
 
@@ -289,8 +298,11 @@ packaged copies match the skill copies.
 These are recorded in [`decisions.md`](decisions.md) and are not hidden by the
 tests.
 
-- **Performance.** Cold extraction of one fixture took 220 s. The 60-second
-  target is not met.
+- **Performance.** Cold extraction of a synthetic 12-page PDF takes 52.4 s on
+  8 cores (an earlier measurement of one different fixture took 220 s). Real
+  lectures are not yet measured. Label recall is unchanged by construction,
+  because the OCR settings did not change. The 60-second target is met only on
+  the synthetic file.
 - **Image occlusion.** Output quality has been checked on few lectures, and
   one earlier run produced no occlusion notes for a figure-heavy lecture. Check
   C05 now flags that case.
