@@ -12,6 +12,16 @@ class Sources:
     def engine(self, workspace):
         return self.store.get(workspace).get("source_engine", "engine")
 
+    def source_data(self, workspace):
+        """(prefix, slides data, labels_pending). A published extraction beats a text-ready marker."""
+        prefix=self.engine(workspace)
+        if not self.store.path(workspace,prefix+'/source/slides.json').is_file() and self.store.path(workspace,'source-partial.json').is_file():
+            try:
+                early=self.store.read_json(workspace,'source-partial.json')['prefix']
+                return early,self.store.read_json(workspace,early+'/source/slides.partial.json'),True
+            except (DomainError,KeyError,TypeError): pass
+        return prefix,self.store.read_json(workspace,prefix+'/source/slides.json'),False
+
     def extract_source(self, workspace, slides=None):
         manifest = self.store.get(workspace)
         if not manifest['source']: raise DomainError('SOURCE', 'Workspace has no source.', 'Create a lecture workspace with a source or pasted text.')
@@ -44,35 +54,51 @@ class Sources:
                             if info.get('width',0)*info.get('height',0)>20_000_000:
                                 raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
             prefix=f'extractions/{uuid.uuid4().hex}/engine'
+            ready=[]
             def progress(kind, done, total):
-                report(f'slides {done}' if kind=='slides' else f'figures {done}/{total}')
-            try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr')
-            except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
+                report(f'slides {done}' if kind=='slides' else ('text ready; ' if ready else '')+f'figures {done}/{total}')
+            def text_ready(data):
+                # The marker is not a revision: it only lets reads answer from the early text.
+                self.store.write_json(workspace,prefix+'/source/slides.partial.json',data)
+                self.store.write_json(workspace,'source-partial.json',{'prefix':prefix})
+                ready.append(1)
+                report(f'text ready; figures 0/{sum(len(slide["figures"]) for slide in data["slides"])}')
+            def clear_marker():
+                try:
+                    if self.store.read_json(workspace,'source-partial.json').get('prefix')==prefix:
+                        self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
+                except DomainError: pass
+            try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr', on_text_ready=text_ready)
+            except extract.ExtractionCancelled as exc:
+                clear_marker(); raise DomainError('CANCELLED','Cancelled.') from exc
             except Exception as exc:
+                clear_marker()
                 # The extractor reports a missing OCR program as its own E24; name the fix instead.
                 if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
                 raise
             # 3. Publish: the source must be the one we read.
-            with self.store.edit(workspace) as state:
-                if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
-                if digest(Path(state['source']['path'])) != state['source']['sha256']: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
-                data = self.store.read_json(workspace,prefix+'/source/slides.json')
-                state['source_engine']=prefix
+            try:
+                with self.store.edit(workspace) as state:
+                    if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
+                    if digest(Path(state['source']['path'])) != state['source']['sha256']: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
+                    data = self.store.read_json(workspace,prefix+'/source/slides.json')
+                    state['source_engine']=prefix
+            finally: clear_marker()
             return {'_committed':True,'slide_count':data['slide_count'], 'map':prefix+'/source/map.md', 'summary':prefix+'/source/slides_summary.json'}
         return self.jobs.submit(workspace,'extract_source',run)
 
     def read_source(self, workspace, slides=None, offset=0, limit=12000):
         from cards.source import slice_text
-        data = self.store.read_json(workspace,self.engine(workspace)+'/source/slides.json')
+        _, data, pending = self.source_data(workspace)
         numbers = selection(slides,[s['n'] for s in data['slides']])
         text = slice_text(data,numbers)
         return {'text':text[offset:offset+limit], 'total_chars':len(text), 'slides':numbers,
-                'next_offset':offset+limit if offset+limit<len(text) else None}
+                'next_offset':offset+limit if offset+limit<len(text) else None, **({'labels_pending':True} if pending else {})}
 
     def search_source(self, workspace, query, offset=0, limit=20):
-        data = self.store.read_json(workspace,self.engine(workspace)+'/source/slides.json')
+        _, data, pending = self.source_data(workspace)
         hits = [{'slide':s['n'],'text':line} for s in data['slides'] for line in s['text'].splitlines() if query.casefold() in line.casefold()]
-        return {'hits':hits[offset:offset+limit], 'total':len(hits), 'next_offset':offset+limit if offset+limit<len(hits) else None}
+        return {'hits':hits[offset:offset+limit], 'total':len(hits), 'next_offset':offset+limit if offset+limit<len(hits) else None, **({'labels_pending':True} if pending else {})}
 
     def get_page_image(self, workspace, page):
         from cards.source import page_image
@@ -84,17 +110,15 @@ class Sources:
         return {'artifact':f'{prefix}/source/pages/p{page:02d}.png'}
 
     def list_figures(self, workspace, offset=0, limit=20):
-        prefix=self.engine(workspace)
-        data = self.store.read_json(workspace,prefix+'/source/slides.json')
+        prefix, data, pending = self.source_data(workspace)
         figures = [dict(f,slide=s['n'],artifact=prefix+'/source/'+f['file']) for s in data['slides'] for f in s['figures']]
-        return {'figures':figures[offset:offset+limit], 'total':len(figures), 'next_offset':offset+limit if offset+limit<len(figures) else None}
+        return {'figures':figures[offset:offset+limit], 'total':len(figures), 'next_offset':offset+limit if offset+limit<len(figures) else None, **({'labels_pending':True} if pending else {})}
 
     def get_figure(self, workspace, figure_id):
-        prefix=self.engine(workspace)
-        data = self.store.read_json(workspace,prefix+'/source/slides.json')
+        prefix, data, pending = self.source_data(workspace)
         for slide in data['slides']:
             for figure in slide['figures']:
-                if figure['fig_id'] == figure_id: return dict(figure,slide=slide['n'],artifact=prefix+'/source/'+figure['file'])
+                if figure['fig_id'] == figure_id: return dict(figure,slide=slide['n'],artifact=prefix+'/source/'+figure['file'],**({'labels_pending':True} if pending else {}))
         raise DomainError('FIGURE','Unknown figure ID.','Use list_figures.')
 
     def import_image(self, workspace, path):

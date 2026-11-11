@@ -109,6 +109,19 @@ def gated(monkeypatch):
     return started, release
 
 
+def gated_text_ready(monkeypatch):
+    from cards import extract
+    real, started, release = extract.extract_source, threading.Event(), threading.Event()
+    early = {'slide_count': 1, 'slides': [{'n': 1, 'title': 'A', 'text': 'Sodium crosses channels.', 'figures': [], 'flags': []}]}
+    def slow(*args, **kwargs):
+        kwargs['on_text_ready'](early)
+        started.set(); release.wait(10)
+        if kwargs.get('should_cancel') and kwargs['should_cancel'](): raise extract.ExtractionCancelled()
+        return real(*args, **kwargs)
+    monkeypatch.setattr(extract, 'extract_source', slow)
+    return started, release
+
+
 def lecture(tmp_path):
     s = Service(tmp_path/'work', [tmp_path])
     return s, s.store.create('lecture', text='# A\n\nSodium crosses channels.\n')['id']
@@ -175,4 +188,28 @@ def test_second_workspace_reuses_ocr_results(tmp_path, monkeypatch):
         wait(s, w, s.extract_source(w))
     assert len(calls) == 1
     assert s.store.list()['total'] == 2      # the cache folder is not a workspace
+    s.close()
+
+
+def test_source_is_readable_before_labels_finish(tmp_path, monkeypatch):
+    started, release = gated_text_ready(monkeypatch); s, w = lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    early = s.read_source(w)
+    assert 'Sodium' in early['text'] and early['labels_pending'] is True
+    assert s.search_source(w, 'sodium')['labels_pending'] is True
+    assert s.jobs.get(w, job['id'])['progress'].startswith('text ready')
+    release.set(); wait(s, w, job)
+    assert 'labels_pending' not in s.read_source(w)
+    assert not s.store.path(w, 'source-partial.json').exists(); s.close()
+
+
+def test_cancel_removes_the_partial_marker(tmp_path, monkeypatch):
+    started, release = gated_text_ready(monkeypatch); s, w = lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    s.jobs.cancel(w, job['id']); release.set()
+    for _ in range(300):
+        if s.jobs.get(w, job['id'])['status'] not in ('queued', 'running'): break
+        time.sleep(.02)
+    assert not s.store.path(w, 'source-partial.json').exists()
+    with pytest.raises(DomainError): s.read_source(w)
     s.close()

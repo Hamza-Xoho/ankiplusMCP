@@ -57,3 +57,12 @@ def test_page_image(tmp_path):
     with pymupdf.open() as doc: doc.new_page(width=960, height=540); doc.save(pdf)
     out = page_image(pdf, tmp_path/'p01.png', 1)
     with Image.open(out) as im: assert max(im.size) == 1000
+
+
+def test_text_ready_fires_once_before_ocr_and_not_on_cache_hit(tmp_path):
+    from cards.extract import extract_source
+    src = tmp_path/'notes.md'; src.write_text('# A\n\nSodium crosses channels.\n'); seen = []
+    extract_source(src, tmp_path/'out', on_text_ready=seen.append)
+    assert len(seen) == 1 and seen[0]['slides'][0]['text']
+    extract_source(src, tmp_path/'out', on_text_ready=seen.append)
+    assert len(seen) == 1

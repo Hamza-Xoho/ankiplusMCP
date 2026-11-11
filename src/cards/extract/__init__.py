@@ -101,14 +101,18 @@ def ocr_figures(paths: list[Path], *, workers: int | None = None, cache_dir: Pat
 def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
                    on_progress: Callable[[str, int, int | None], None] | None = None,
                    should_cancel: Callable[[], bool] | None = None,
-                   workers: int | None = None, ocr_cache: Path | None = None) -> Extraction:
+                   workers: int | None = None, ocr_cache: Path | None = None,
+                   on_text_ready: Callable[[dict], None] | None = None) -> Extraction:
     """Extract `source` into `out_dir/source`; reads no build.json.
 
     on_progress('slides', done, None) follows each slide read; on_progress('figures', done, total)
     follows each finished OCR group, where total is the number of figures. should_cancel is asked
     after each slide and before each figure's OCR (from worker threads, so it must be thread-safe
     and quick); on_progress is only ever called from the calling thread. workers sets the OCR thread
-    count (default: every core); ocr_cache is a folder that remembers OCR results by image content."""
+    count (default: every core); ocr_cache is a folder that remembers OCR results by image content.
+    on_text_ready(data) is called once, after every slide is read and every figure crop is saved and
+    before any OCR, with a dict shaped like slides.json whose figure labels are empty; not called on a
+    cache hit."""
     path = Path(source)
     build = Build(out_dir)
     spec = slides
@@ -140,6 +144,25 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
             raise ExtractionCancelled()
     slides = records
     figures = {build.path('source/'+f['file']): f for s in slides for f in s['figures']}
+    if not slides:
+        raise CardsError('E21',f'{path}: line 1 field text empty','supply a non-empty lecture source')
+    previous = None
+    for s in slides:
+        s['word_count'] = len(s['text'].split())
+        if s['word_count']<15: s['flags'].append('low_text')
+        if s['title'] and s['title']==previous: s['flags'].append('repeated_title')
+        previous = s['title']
+    import re
+    identity = re.match(r'([A-Za-z]+\d+)[_ -]+L(\d+)', path.stem, re.I)
+    lecture = f'{identity[1].upper()}-L{int(identity[2]):03d}' if identity else path.stem
+    data = {'lecture':lecture,'slide_count':len(slides),'source_sha256':digest,
+            'selection':spec,'cache_version':CACHE_VERSION,'slides':slides}
+    for figure in figures.values():
+        figure['ocr_labels'] = []
+        figure['repeated_labels'] = []
+    if on_text_ready:
+        import copy
+        on_text_ready(copy.deepcopy(data))
     try:
         found = ocr_figures(list(figures), workers=workers, cache_dir=ocr_cache,
                             on_progress=(lambda done, total: on_progress('figures',done,total)) if on_progress else None,
@@ -150,21 +173,8 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
     for figure_path, figure in figures.items():
         figure['ocr_labels'] = found[figure_path]['regions']
         figure['repeated_labels'] = list(found[figure_path]['repeated'])
-    if not slides:
-        raise CardsError('E21',f'{path}: line 1 field text empty','supply a non-empty lecture source')
     figs = [f for s in slides for f in s['figures']]
-    previous = None
-    for s in slides:
-        s['word_count'] = len(s['text'].split())
-        if s['word_count']<15: s['flags'].append('low_text')
-        if s['title'] and s['title']==previous: s['flags'].append('repeated_title')
-        previous = s['title']
     objs = objectives.find(slides)
-    import re
-    identity = re.match(r'([A-Za-z]+\d+)[_ -]+L(\d+)', path.stem, re.I)
-    lecture = f'{identity[1].upper()}-L{int(identity[2]):03d}' if identity else path.stem
-    data = {'lecture':lecture,'slide_count':len(slides),'source_sha256':digest,
-            'selection':spec,'cache_version':CACHE_VERSION,'slides':slides}
     write_json(cache,data,'cards extract')
     write_json(build.path('source/objectives.json'),objs,'cards extract')
     write_json(build.path('source/slides_summary.json'),summary.build(lecture,slides,objs['objectives']),'cards extract')
