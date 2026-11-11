@@ -17,9 +17,14 @@ class Sources:
         prefix=self.engine(workspace)
         if not self.store.path(workspace,prefix+'/source/slides.json').is_file() and self.store.path(workspace,'source-partial.json').is_file():
             try:
-                early=self.store.read_json(workspace,'source-partial.json')['prefix']
-                return early,self.store.read_json(workspace,early+'/source/slides.partial.json'),True
-            except (DomainError,KeyError,TypeError): pass
+                marker=self.store.read_json(workspace,'source-partial.json')
+                early=marker['prefix']
+                try: running=self.jobs.get(workspace,marker['job'])['status'] in ('queued','running')
+                except DomainError: running=False
+                if running: return early,self.store.read_json(workspace,early+'/source/slides.partial.json'),True
+                # Its job is gone (killed server, unknown id): behave as if no extraction had started.
+                self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
+            except (DomainError,KeyError,TypeError,OSError): pass
         return prefix,self.store.read_json(workspace,prefix+'/source/slides.json'),False
 
     def extract_source(self, workspace, slides=None):
@@ -60,24 +65,23 @@ class Sources:
             def text_ready(data):
                 # The marker is not a revision: it only lets reads answer from the early text.
                 self.store.write_json(workspace,prefix+'/source/slides.partial.json',data)
-                self.store.write_json(workspace,'source-partial.json',{'prefix':prefix})
+                self.store.write_json(workspace,'source-partial.json',{'prefix':prefix,'job':getattr(report,'job',None)})
                 ready.append(1)
                 report(f'text ready; figures 0/{sum(len(slide["figures"]) for slide in data["slides"])}')
             def clear_marker():
+                # Compare-then-remove is not atomic: the worst case is losing a concurrent run's early text, never serving stale data.
                 try:
                     if self.store.read_json(workspace,'source-partial.json').get('prefix')==prefix:
                         self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
-                except DomainError: pass
-            try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr', on_text_ready=text_ready)
-            except extract.ExtractionCancelled as exc:
-                clear_marker(); raise DomainError('CANCELLED','Cancelled.') from exc
-            except Exception as exc:
-                clear_marker()
-                # The extractor reports a missing OCR program as its own E24; name the fix instead.
-                if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
-                raise
-            # 3. Publish: the source must be the one we read.
+                except (DomainError,OSError): pass
             try:
+                try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr', on_text_ready=text_ready)
+                except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
+                except Exception as exc:
+                    # The extractor reports a missing OCR program as its own E24; name the fix instead.
+                    if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
+                    raise
+                # 3. Publish: the source must be the one we read.
                 with self.store.edit(workspace) as state:
                     if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
                     if digest(Path(state['source']['path'])) != state['source']['sha256']: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')

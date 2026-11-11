@@ -213,3 +213,27 @@ def test_cancel_removes_the_partial_marker(tmp_path, monkeypatch):
     assert not s.store.path(w, 'source-partial.json').exists()
     with pytest.raises(DomainError): s.read_source(w)
     s.close()
+
+
+def _dead_marker(s, w, job_id, record):
+    s.store.write_json(w, 'early/source/slides.partial.json', {'slide_count': 1, 'slides': [
+        {'n': 1, 'title': 'A', 'text': 'Sodium crosses channels.', 'figures': [], 'flags': []}]})
+    s.store.write_json(w, 'source-partial.json', {'prefix': 'early', 'job': job_id})
+    if record: s.store.write_json(w, f'jobs/{job_id}.json', record)
+
+
+def test_marker_of_a_dead_job_is_ignored(tmp_path):
+    s, w = lecture(tmp_path)
+    _dead_marker(s, w, 'deadjob', {'id': 'deadjob', 'owner': 'nolease', 'operation': 'extract_source',
+                                   'status': 'running', 'progress': 'text ready', 'cancel_requested': False})
+    with pytest.raises(DomainError): s.read_source(w)
+    assert not s.store.path(w, 'source-partial.json').exists()
+    s.close()
+
+
+def test_marker_of_an_unknown_job_is_ignored(tmp_path):
+    s, w = lecture(tmp_path)
+    _dead_marker(s, w, 'nosuchjob', None)
+    with pytest.raises(DomainError): s.search_source(w, 'sodium')
+    assert not s.store.path(w, 'source-partial.json').exists()
+    s.close()
