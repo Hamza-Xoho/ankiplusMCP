@@ -237,3 +237,103 @@ def test_marker_of_an_unknown_job_is_ignored(tmp_path):
     with pytest.raises(DomainError): s.search_source(w, 'sodium')
     assert not s.store.path(w, 'source-partial.json').exists()
     s.close()
+
+
+REGION = {'text': 'Sodium', 'conf': 90, 'left': .1, 'top': .1, 'width': .2, 'height': .1}
+
+
+def figure_lecture(tmp_path):
+    import io, pymupdf
+    buf = io.BytesIO(); Image.new('RGB', (400, 300), 'white').save(buf, 'PNG')
+    pdf = tmp_path/'lecture.pdf'
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=960, height=540); page.insert_text((40, 40), 'Membrane transport')
+        page.insert_image(pymupdf.Rect(100, 80, 860, 520), stream=buf.getvalue()); doc.save(pdf)
+    s = Service(tmp_path/'work', [tmp_path])
+    return s, s.store.create('lecture', source_path=str(pdf))['id']
+
+
+def gated_ocr(monkeypatch, fail=False):
+    """The real extractor, with OCR held until released (and optionally failing)."""
+    from cards import extract
+    started, release = threading.Event(), threading.Event()
+    def slow(paths, **kwargs):
+        started.set(); release.wait(10)
+        if fail: raise RuntimeError('ocr broke')
+        return {p: {'regions': [REGION], 'repeated': {}} for p in paths}
+    monkeypatch.setattr(extract, 'ocr_figures', slow)
+    return started, release
+
+
+def test_map_and_figures_while_labels_pending(tmp_path, monkeypatch):
+    started, release = gated_ocr(monkeypatch); s, w = figure_lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    marker = s.store.read_json(w, 'source-partial.json')
+    map_path = marker['prefix'] + '/source/map.md'
+    assert map_path in s.jobs.get(w, job['id'])['progress']
+    early = s.read_artifact(w, map_path)
+    assert early['labels_pending'] is True and 'labels pending' in early['text']
+    listed = s.list_figures(w)
+    assert listed['labels_pending'] is True and listed['figures'][0]['ocr_labels'] is None
+    figure = s.get_figure(w, listed['figures'][0]['fig_id'])
+    assert figure['labels_pending'] is True and figure['ocr_labels'] is None
+    assert s.image_bytes(w, figure['artifact']).startswith(b'\x89PNG')
+    assert s.image_bytes(w, s.get_page_image(w, 1)['artifact']).startswith(b'\x89PNG')
+    s.save_cards(w, [{'id': 'a', 'fields': {'Text': '{{c1::Sodium}} crosses'}, 'source_ref': [1]}], s.store.get(w)['revision'])
+    with pytest.raises(DomainError) as caught: s.check_cards(w, coverage=True)
+    assert caught.value.code == 'LABELS_PENDING' and job['id'] in caught.value.message
+    assert s.check_cards(w)['checked'] == 1          # checks that need no extraction still run
+    release.set(); result = wait(s, w, job)
+    assert result['map'] == map_path
+    after = s.read_artifact(w, map_path)
+    assert 'labels_pending' not in after and 'labels pending' not in after['text']
+    listed = s.list_figures(w)
+    assert 'labels_pending' not in listed and listed['figures'][0]['ocr_labels'] == [REGION]
+    assert s.get_figure(w, listed['figures'][0]['fig_id'])['ocr_labels'] == [REGION]
+    assert s.check_cards(w, coverage=True)['coverage'] is not None
+    s.close()
+
+
+def test_published_data_beats_the_marker(tmp_path, monkeypatch):
+    started, release = gated_ocr(monkeypatch); release.set(); s, w = figure_lecture(tmp_path)
+    wait(s, w, s.extract_source(w))
+    published = s.store.get(w)['source_engine'] + '/source/map.md'
+    _dead_marker(s, w, 'livejob', {'id': 'livejob', 'owner': s.jobs.owner, 'operation': 'extract_source',
+                                   'status': 'running', 'progress': 'text ready', 'cancel_requested': False})
+    listed = s.list_figures(w)
+    assert 'labels_pending' not in listed and listed['figures'][0]['ocr_labels'] == [REGION]
+    assert 'labels_pending' not in s.read_artifact(w, published)
+    assert s.check_cards(w, coverage=True)['coverage'] is not None
+    s.close()
+
+
+def test_publish_compares_with_the_hash_that_was_read(tmp_path, monkeypatch):
+    from pathlib import Path
+    from ankiplusmcp.store import digest
+    started, release = gated_ocr(monkeypatch); s, w = figure_lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    with s.store.edit(w) as state:        # the source and its recorded hash both move on mid-extraction
+        path = Path(state['source']['path']); path.chmod(0o644); path.write_bytes(path.read_bytes() + b'\n%changed')
+        state['source']['sha256'] = digest(path)
+    release.set()
+    for _ in range(300):
+        record = s.jobs.get(w, job['id'])
+        if record['status'] not in ('queued', 'running'): break
+        time.sleep(.02)
+    assert record['status'] == 'failed' and record['error']['code'] == 'SOURCE_CHANGED'
+    assert 'source_engine' not in s.store.get(w); s.close()
+
+
+def test_failed_extraction_clears_the_marker(tmp_path, monkeypatch):
+    started, release = gated_ocr(monkeypatch, fail=True); s, w = figure_lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    assert s.store.path(w, 'source-partial.json').exists()
+    release.set()
+    for _ in range(300):
+        record = s.jobs.get(w, job['id'])
+        if record['status'] not in ('queued', 'running'): break
+        time.sleep(.02)
+    assert record['status'] == 'failed'
+    assert not s.store.path(w, 'source-partial.json').exists()
+    with pytest.raises(DomainError): s.list_figures(w)
+    s.close()

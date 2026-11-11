@@ -15,8 +15,10 @@ class Artifacts:
         if not path.is_file() or path.stat().st_size > MAX_FILE or path.suffix.lower() not in ('.json','.jsonl','.txt','.md','.html','.css','.csv','.toml'):
             raise DomainError('ARTIFACT', 'Artifact missing, oversized, or not text.', 'Use list_artifacts or get_image.')
         text = path.read_text(encoding='utf-8')
+        # The early map and summary of a running extraction: say their figure labels are not read yet.
+        pending = self.labels_pending_for(workspace, artifact)
         return {'artifact':artifact, 'text':text[offset:offset+limit], 'total_chars':len(text),
-                'next_offset':offset+limit if offset+limit<len(text) else None}
+                'next_offset':offset+limit if offset+limit<len(text) else None, **({'labels_pending':True} if pending else {})}
 
     def image_bytes(self, workspace, artifact):
         path = self.store.path(workspace, artifact)

@@ -12,20 +12,40 @@ class Sources:
     def engine(self, workspace):
         return self.store.get(workspace).get("source_engine", "engine")
 
+    def pending_marker(self, workspace):
+        """The text-ready marker {'prefix','job'} while its job is queued or running, else None."""
+        if not self.store.path(workspace,'source-partial.json').is_file(): return None
+        try:
+            marker=self.store.read_json(workspace,'source-partial.json')
+            try: running=self.jobs.get(workspace,marker['job'])['status'] in ('queued','running')
+            except DomainError: running=False
+            if running and isinstance(marker['prefix'],str): return marker
+            # Its job is gone (killed server, unknown id): behave as if no extraction had started.
+            self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
+        except (DomainError,KeyError,TypeError,OSError): pass
+        return None
+
+    def published(self, workspace):
+        return self.store.path(workspace,self.engine(workspace)+'/source/slides.json').is_file()
+
     def source_data(self, workspace):
         """(prefix, slides data, labels_pending). A published extraction beats a text-ready marker."""
         prefix=self.engine(workspace)
-        if not self.store.path(workspace,prefix+'/source/slides.json').is_file() and self.store.path(workspace,'source-partial.json').is_file():
-            try:
-                marker=self.store.read_json(workspace,'source-partial.json')
-                early=marker['prefix']
-                try: running=self.jobs.get(workspace,marker['job'])['status'] in ('queued','running')
-                except DomainError: running=False
-                if running: return early,self.store.read_json(workspace,early+'/source/slides.partial.json'),True
-                # Its job is gone (killed server, unknown id): behave as if no extraction had started.
-                self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
-            except (DomainError,KeyError,TypeError,OSError): pass
+        marker=None if self.published(workspace) else self.pending_marker(workspace)
+        if marker:
+            data=self.store.read_json(workspace,marker['prefix']+'/source/slides.partial.json')
+            for slide in data['slides']:
+                for figure in slide['figures']:
+                    figure['ocr_labels']=figure['repeated_labels']=None   # not read yet, unlike []: read, none found
+            return marker['prefix'],data,True
         return prefix,self.store.read_json(workspace,prefix+'/source/slides.json'),False
+
+    def require_extraction(self, workspace, needs):
+        """Refuse, retryably, while only the early text exists and no finished extraction is published."""
+        marker=None if self.published(workspace) else self.pending_marker(workspace)
+        if marker:
+            raise DomainError('LABELS_PENDING',f'Figure labels are still being read by job {marker["job"]}; {needs} needs the finished extraction.',
+                              'Wait until get_job reports that job completed, then retry.')
 
     def extract_source(self, workspace, slides=None):
         manifest = self.store.get(workspace)
@@ -60,14 +80,16 @@ class Sources:
                                 raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
             prefix=f'extractions/{uuid.uuid4().hex}/engine'
             ready=[]
+            # The core has already written the early map (figures marked "labels pending") when text_ready runs.
+            early=f'text ready; map readable now at {prefix}/source/map.md; '
             def progress(kind, done, total):
-                report(f'slides {done}' if kind=='slides' else ('text ready; ' if ready else '')+f'figures {done}/{total}')
+                report(f'slides {done}' if kind=='slides' else (early if ready else '')+f'figures {done}/{total}')
             def text_ready(data):
                 # The marker is not a revision: it only lets reads answer from the early text.
                 self.store.write_json(workspace,prefix+'/source/slides.partial.json',data)
                 self.store.write_json(workspace,'source-partial.json',{'prefix':prefix,'job':getattr(report,'job',None)})
                 ready.append(1)
-                report(f'text ready; figures 0/{sum(len(slide["figures"]) for slide in data["slides"])}')
+                report(early+f'figures 0/{sum(len(slide["figures"]) for slide in data["slides"])}')
             def clear_marker():
                 # Compare-then-remove is not atomic: the worst case is losing a concurrent run's early text, never serving stale data.
                 try:
@@ -84,7 +106,8 @@ class Sources:
                 # 3. Publish: the source must be the one we read.
                 with self.store.edit(workspace) as state:
                     if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
-                    if digest(Path(state['source']['path'])) != state['source']['sha256']: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
+                    # Compare with the hash phase 1 checked: that is the file the extractor read.
+                    if digest(Path(state['source']['path'])) != sha: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
                     data = self.store.read_json(workspace,prefix+'/source/slides.json')
                     state['source_engine']=prefix
             finally: clear_marker()
@@ -107,11 +130,16 @@ class Sources:
     def get_page_image(self, workspace, page):
         from cards.source import page_image
         with self.store.edit(workspace) as state:
-            prefix=self.engine(workspace)
-            data=self.store.read_json(workspace,prefix+'/source/slides.json')
+            # Pages depend only on the PDF, so the early text's folder serves while labels are pending.
+            prefix, data, _ = self.source_data(workspace)
             selection(str(page),[s['n'] for s in data['slides']])
             page_image(Path(state['source']['path']),self.store.path(workspace,f'{prefix}/source/pages/p{page:02d}.png'),page)
         return {'artifact':f'{prefix}/source/pages/p{page:02d}.png'}
+
+    def labels_pending_for(self, workspace, artifact):
+        """True when `artifact` lies in an extraction whose figure labels are still being read."""
+        marker=self.pending_marker(workspace)
+        return bool(marker) and self.store.path(workspace,marker['prefix']) in self.store.path(workspace,artifact).parents
 
     def list_figures(self, workspace, offset=0, limit=20):
         prefix, data, pending = self.source_data(workspace)

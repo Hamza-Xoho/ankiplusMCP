@@ -68,6 +68,38 @@ def test_text_ready_fires_once_before_ocr_and_not_on_cache_hit(tmp_path):
     assert len(seen) == 1
 
 
+def _figure_pdf(tmp_path):
+    import io, pymupdf
+    from PIL import Image
+    buf = io.BytesIO(); Image.new('RGB', (400, 300), 'white').save(buf, 'PNG')
+    pdf = tmp_path/'MED241_L025_figure.pdf'
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=960, height=540); page.insert_text((40, 40), 'Membrane transport')
+        page.insert_image(pymupdf.Rect(100, 80, 860, 520), stream=buf.getvalue()); doc.save(pdf)
+    return pdf
+
+
+def test_early_map_marks_pending_labels_and_final_files_are_unchanged(tmp_path, monkeypatch):
+    import json
+    from cards.extract import extract_source, ocr
+    region = {'text': 'Sodium', 'conf': 90, 'left': .1, 'top': .1, 'width': .2, 'height': .1}
+    monkeypatch.setattr(ocr, 'extract', lambda path, **kw: {'regions': [region], 'repeated': {}})
+    monkeypatch.setattr(ocr, 'tesseract_version', lambda: 'tesseract 5.5.4')
+    pdf = _figure_pdf(tmp_path); seen = {}
+    def ready(data):
+        seen['map'] = (tmp_path/'out/source/map.md').read_text()
+        seen['summary'] = json.loads((tmp_path/'out/source/slides_summary.json').read_text())
+    extract_source(pdf, tmp_path/'out', on_text_ready=ready)
+    assert 'labels pending' in seen['map'] and 'Sodium' not in seen['map']
+    figure = seen['summary']['slides'][0]['figures'][0]
+    assert figure['labels_pending'] is True and figure['label_count'] is None
+    extract_source(pdf, tmp_path/'plain')     # no callback: the CLI path
+    body = lambda name, folder: [line for line in (tmp_path/folder/'source'/name).read_text().splitlines()
+                                 if 'cards extract' not in line and '"created"' not in line]
+    for name in ('map.md', 'slides_summary.json', 'slides.json', 'objectives.json'):
+        assert body(name, 'out') == body(name, 'plain') and 'pending' not in ''.join(body(name, 'out'))
+
+
 def test_launch_options():
     from cards.render import launch_options
     assert launch_options('chromium') == {}

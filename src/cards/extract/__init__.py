@@ -98,6 +98,28 @@ def ocr_figures(paths: list[Path], *, workers: int | None = None, cache_dir: Pat
             raise
     return {p: results[p] for p in paths}
 
+def _write_early_map(build, lecture, slides):
+    """map.md and slides_summary.json from label-free slides; every figure says its labels are pending.
+    The final files written after OCR replace both. Works on a copy: objectives.find adds flags."""
+    import copy
+    slides = copy.deepcopy(slides)
+    objs = objectives.find(slides)
+    early = summary.build(lecture, slides, objs['objectives'])
+    for page in early['slides']:
+        for figure in page['figures']:
+            figure.update(label_count=None, type=None, label_summary=None, labels_pending=True)
+    early['labels_pending'] = any(s['figures'] for s in slides)
+    lines = mapgen.generate(lecture, slides, objs['objectives']).split('\n')
+    if early['labels_pending']:
+        lines[0] += ' · figure labels pending'
+    for number, s in enumerate(slides, 1):
+        if s['figures']:
+            # Titles never contain '|', so the only ' | fig:N' is the figure column.
+            count = f" | fig:{len(s['figures'])}"
+            lines[number] = lines[number].replace(count, count + ' labels pending', 1)
+    write_json(build.path('source/slides_summary.json'), early, 'cards extract')
+    write_text(build.path('source/map.md'), '\n'.join(lines), 'cards extract')
+
 def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
                    on_progress: Callable[[str, int, int | None], None] | None = None,
                    should_cancel: Callable[[], bool] | None = None,
@@ -162,6 +184,7 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
         figure['repeated_labels'] = []
     if on_text_ready:
         import copy
+        _write_early_map(build, lecture, slides)
         on_text_ready(copy.deepcopy(data))
     try:
         found = ocr_figures(list(figures), workers=workers, cache_dir=ocr_cache,

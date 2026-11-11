@@ -64,6 +64,7 @@ class Cards:
         coverage_result=None
         if coverage:
             from cards.check.coverage import summarize
+            self.require_extraction(workspace,'coverage')   # objectives.json exists only once labels are read
             data=self.store.read_json(workspace,self.engine(workspace)+'/source/slides.json')
             objectives=self.store.read_json(workspace,self.engine(workspace)+'/source/objectives.json')['objectives']
             skips=self.store.read_json(workspace,'omissions.json') if self.store.path(workspace,'omissions.json').exists() else []
