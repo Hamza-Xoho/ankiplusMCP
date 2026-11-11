@@ -1,4 +1,5 @@
 import json
+import threading
 import time
 import pytest
 from PIL import Image
@@ -94,3 +95,64 @@ def test_workspace_has_no_fake_build_json(tmp_path):
     wait(s, w, s.extract_source(w))
     assert not list((tmp_path/'work').rglob('build.json'))
     s.close()
+
+
+def gated(monkeypatch):
+    from cards import extract
+    real, started, release = extract.extract_source, threading.Event(), threading.Event()
+    def slow(*args, **kwargs):
+        if kwargs.get('on_progress'): kwargs['on_progress']('figures', 3, 10)
+        started.set(); release.wait(10)
+        if kwargs.get('should_cancel') and kwargs['should_cancel'](): raise extract.ExtractionCancelled()
+        return real(*args, **kwargs)
+    monkeypatch.setattr(extract, 'extract_source', slow)
+    return started, release
+
+
+def lecture(tmp_path):
+    s = Service(tmp_path/'work', [tmp_path])
+    return s, s.store.create('lecture', text='# A\n\nSodium crosses channels.\n')['id']
+
+
+def test_reads_do_not_wait_for_extraction(tmp_path, monkeypatch):
+    started, release = gated(monkeypatch); s, w = lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    t = time.monotonic(); s.get_cards(w); assert time.monotonic() - t < 1
+    assert s.jobs.get(w, job['id'])['progress'] == 'figures 3/10'
+    release.set(); wait(s, w, job); s.close()
+
+
+def test_cancel_mid_extraction_then_retry(tmp_path, monkeypatch):
+    started, release = gated(monkeypatch); s, w = lecture(tmp_path)
+    job = s.extract_source(w); assert started.wait(5)
+    s.jobs.cancel(w, job['id']); release.set()
+    for _ in range(300):
+        if s.jobs.get(w, job['id'])['status'] not in ('queued', 'running'): break
+        time.sleep(.02)
+    assert s.jobs.get(w, job['id'])['status'] == 'cancelled'
+    assert 'source_engine' not in s.store.get(w)
+    release.set(); wait(s, w, s.extract_source(w)); assert 'Sodium' in s.read_source(w)['text']; s.close()
+
+
+def test_source_changed_during_extraction_publishes_nothing(tmp_path, monkeypatch):
+    from ankiplusmcp import sources
+    s, w = lecture(tmp_path); real = sources.digest; calls = []
+    def digest(path):          # the first check sees the real hash, the check at publish time does not
+        calls.append(path)
+        return real(path) if len(calls) == 1 else 'changed'
+    monkeypatch.setattr(sources, 'digest', digest)
+    job = s.extract_source(w)
+    for _ in range(300):
+        record = s.jobs.get(w, job['id'])
+        if record['status'] not in ('queued', 'running'): break
+        time.sleep(.02)
+    assert record['status'] == 'failed' and record['error']['code'] == 'SOURCE_CHANGED'
+    assert 'source_engine' not in s.store.get(w); s.close()
+
+
+def test_two_extractions_at_once_leave_one_complete_result(tmp_path):
+    s, w = lecture(tmp_path)
+    a, b = s.extract_source(w, slides='1'), s.extract_source(w)
+    wait(s, w, a); wait(s, w, b)
+    engine = s.store.get(w)['source_engine']
+    assert s.store.read_json(w, engine + '/source/slides.json')['slide_count'] >= 1; s.close()

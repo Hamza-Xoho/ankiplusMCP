@@ -81,7 +81,7 @@ class Cards:
             selected=self._select(workspace,ids)
             if not selected: raise DomainError('CARD','No cards to render.','Save cards first.')
             revision=self.store.get(workspace)['revision']
-        def run(cancel):
+        def run(cancel, report):
             from cards import render
             from cards.render.templates import CLOZE, fill, page
             from cards.render.occlusion import bodies

@@ -39,7 +39,7 @@ def test_jobs_cancel_and_restart(tmp_path):
     store = Store(tmp_path/'work', [tmp_path]); w = store.create('cards')
     jobs = Jobs(store, workers=1)
     entered = threading.Event(); release = threading.Event()
-    def operation(cancel):
+    def operation(cancel, report):
         entered.set(); release.wait(5)
         if cancel(): raise DomainError('CANCELLED', 'cancelled', 'submit again')
         return {'done':True}
@@ -76,7 +76,7 @@ def test_live_job_owner_not_recovered_by_second_server(tmp_path):
     store=Store(tmp_path/'work',[tmp_path]); w=store.create('cards')['id']
     first=Jobs(store); second=Jobs(store)
     entered=threading.Event(); release=threading.Event()
-    def callback(cancel): entered.set(); release.wait(3); return {}
+    def callback(cancel, report): entered.set(); release.wait(3); return {}
     job=first.submit(w,'test',callback); assert entered.wait(2)
     assert second.get(w,job['id'])['status']=='running'
     second.cancel(w,job['id']); release.set(); first.close(); second.close()

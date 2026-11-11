@@ -15,42 +15,50 @@ class Sources:
     def extract_source(self, workspace, slides=None):
         manifest = self.store.get(workspace)
         if not manifest['source']: raise DomainError('SOURCE', 'Workspace has no source.', 'Create a lecture workspace with a source or pasted text.')
-        def run(cancel):
+        def run(cancel, report):
             from cards import extract
-            with self.store.edit(workspace) as state:
+            # 1. Under the lock: reuse a matching earlier extraction.
+            with self.store.lock(workspace):
+                state = self.store.get(workspace)
+                path = Path(state['source']['path']); sha = state['source']['sha256']
                 if cancel(): raise DomainError('CANCELLED','Cancelled.')
-                path = Path(state['source']['path'])
-                if digest(path) != state['source']['sha256']: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
+                if digest(path) != sha: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
                 previous=state.get('source_engine')
                 if previous and self.store.path(workspace,previous+'/source/slides.json').is_file():
                     cached=self.store.read_json(workspace,previous+'/source/slides.json')
                     required=['map.md','objectives.json','slides_summary.json']+[f['file'] for slide in cached.get('slides',[]) for f in slide.get('figures',[])]
-                    if (cached.get('source_sha256')==state['source']['sha256'] and cached.get('selection')==slides
+                    if (cached.get('source_sha256')==sha and cached.get('selection')==slides
                             and cached.get('cache_version')==extract.CACHE_VERSION
                             and all(self.store.path(workspace,previous+'/source/'+name).is_file() for name in required)):
                         return {'_committed':True,'cached':True,'slide_count':cached['slide_count'],
                                 'map':previous+'/source/map.md','summary':previous+'/source/slides_summary.json'}
-                if path.suffix=='.pdf':
-                    import pymupdf
-                    with pymupdf.open(path) as pdf:
-                        if len(pdf)>500: raise DomainError('LIMIT','PDF exceeds 500 pages; split the source.')
-                        for page in pdf:
-                            if page.rect.width*page.rect.height*16>20_000_000 or max(page.rect.width,page.rect.height)*4>32000:
-                                raise DomainError('LIMIT','PDF page exceeds safe 4x raster limits.','Resize the PDF pages before extraction.')
-                            for info in page.get_image_info():
-                                if info.get('width',0)*info.get('height',0)>20_000_000:
-                                    raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
-                prefix=f'extractions/{uuid.uuid4().hex}/engine'
-                try: extract.extract_source(path, self.store.path(workspace,prefix), slides, should_cancel=cancel)
-                except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
-                except Exception as exc:
-                    # The extractor reports a missing OCR program as its own E24; name the fix instead.
-                    if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
-                    raise
+            # 2. No lock: limits, then the slow extraction into a fresh folder.
+            if path.suffix=='.pdf':
+                import pymupdf
+                with pymupdf.open(path) as pdf:
+                    if len(pdf)>500: raise DomainError('LIMIT','PDF exceeds 500 pages; split the source.')
+                    for page in pdf:
+                        if page.rect.width*page.rect.height*16>20_000_000 or max(page.rect.width,page.rect.height)*4>32000:
+                            raise DomainError('LIMIT','PDF page exceeds safe 4x raster limits.','Resize the PDF pages before extraction.')
+                        for info in page.get_image_info():
+                            if info.get('width',0)*info.get('height',0)>20_000_000:
+                                raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
+            prefix=f'extractions/{uuid.uuid4().hex}/engine'
+            def progress(kind, done, total):
+                report(f'slides {done}' if kind=='slides' else f'figures {done}/{total}')
+            try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel)
+            except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
+            except Exception as exc:
+                # The extractor reports a missing OCR program as its own E24; name the fix instead.
+                if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
+                raise
+            # 3. Publish: the source must be the one we read.
+            with self.store.edit(workspace) as state:
                 if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
+                if digest(Path(state['source']['path'])) != state['source']['sha256']: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
                 data = self.store.read_json(workspace,prefix+'/source/slides.json')
                 state['source_engine']=prefix
-                return {'_committed':True,'slide_count':data['slide_count'], 'map':prefix+'/source/map.md', 'summary':prefix+'/source/slides_summary.json'}
+            return {'_committed':True,'slide_count':data['slide_count'], 'map':prefix+'/source/map.md', 'summary':prefix+'/source/slides_summary.json'}
         return self.jobs.submit(workspace,'extract_source',run)
 
     def read_source(self, workspace, slides=None, offset=0, limit=12000):
@@ -96,7 +104,7 @@ class Sources:
     def ocr_image(self, workspace, artifact, min_conf=20, min_len=2, group=True, pad=.004):
         doctor.require('tesseract')
         self.image_bytes(workspace,artifact)  # verify image and size before OCR
-        def run(cancel):
+        def run(cancel, report):
             from cards.extract.ocr import extract
             with self.store.edit(workspace):
                 if cancel(): raise DomainError('CANCELLED','Cancelled.')
@@ -137,7 +145,7 @@ class Sources:
     def export_figures(self, workspace, pages=None, zoom=4, min_frac=.05, whole_page=False):
         source=self.store.get(workspace)['source']
         if not source or Path(source['path']).suffix!='.pdf': raise DomainError('SOURCE','Figure export requires a PDF.')
-        def run(cancel):
+        def run(cancel, report):
             import pymupdf
             with self.store.edit(workspace):
                 prefix=f'exports/{uuid.uuid4().hex}'; figures=[]

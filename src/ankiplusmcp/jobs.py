@@ -32,8 +32,9 @@ class Jobs:
         if cancelled():
             self._update(workspace, ident, status='cancelled', progress='cancelled before start'); return
         self._update(workspace, ident, status='running', progress='operation running')
+        report = lambda text: self._update(workspace, ident, progress=text)
         try:
-            result = callback(cancelled)
+            result = callback(cancelled, report)
             committed=result.pop('_committed',False) if isinstance(result,dict) else False
             stopped=cancelled() and not committed
             self._update(workspace, ident, status='cancelled' if stopped else 'completed',
