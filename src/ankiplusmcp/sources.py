@@ -105,18 +105,18 @@ class Sources:
 
     def build_occlusion(self, workspace, artifact, regions, mode='one', keep=None):
         from PIL import Image
-        from cards.figures import _regions, _occlusion, _images
+        from cards.figures import parse_regions, occlusion_markup, write_images
         if mode not in ('one','all'): raise DomainError('MODE','Use one or all.')
         self.image_bytes(workspace,artifact)
-        parsed = _regions(regions,','.join(map(str,keep)) if keep is not None else None)
+        parsed = parse_regions(regions,','.join(map(str,keep)) if keep is not None else None)
         if not parsed: raise DomainError('REGIONS','Supply at least one region.')
         with self.store.edit(workspace):
             ident = uuid.uuid4().hex
             media, preview = f'media/{ident}.png',f'media/{ident}_preview.png'
             self.store.path(workspace,media).parent.mkdir(exist_ok=True)
             with Image.open(self.store.path(workspace,artifact)) as im:
-                _images(im.convert('RGB'),parsed,self.store.path(workspace,media),self.store.path(workspace,preview))
-            result = {'fields':{'Image':f'<img src="{ident}.png">','Occlusion':_occlusion(parsed,mode)},
+                write_images(im.convert('RGB'),parsed,self.store.path(workspace,media),self.store.path(workspace,preview))
+            result = {'fields':{'Image':f'<img src="{ident}.png">','Occlusion':occlusion_markup(parsed,mode)},
                       'media':[{'path':media,'filename':ident+'.png'}], 'preview':preview, 'regions':parsed}
             self.store.write_json(workspace,f'occlusions/{ident}.json',result)
         return result

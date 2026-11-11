@@ -7,7 +7,7 @@ STOP_U={'and','or','both','the','a','an','of','in','to','is','are','with','all'}
 def plain(s):
     return html.unescape(re.sub(r'<[^>]+>','',CLOZE.sub(lambda m:m[2],s)))
 
-def lint(n,enumeration=False):
+def lint(n,enumeration=False,tag_root='#ColdRecall'):
     f=n.get('fields'); out=[]
     if not isinstance(f,dict) or not all(isinstance(v,str) for v in f.values()): return out
     text=f.get('Text',f.get('Front','')); extra=f.get('Extra',f.get('Back Extra',''))
@@ -31,7 +31,7 @@ def lint(n,enumeration=False):
     if len(plain(text))>200: flag('L08','card text exceeds 200 characters')
     if len(re.findall(r'<(?:b|strong)\b',text,re.I))>4: flag('L09','more than four bold runs')
     tags=n.get('tags')
-    if isinstance(tags,list) and any(isinstance(t,str) and not t.startswith('#ColdRecall::') for t in tags): flag('L10','foreign tag tree')
+    if isinstance(tags,list) and any(isinstance(t,str) and not t.startswith(tag_root+'::') for t in tags): flag('L10','foreign tag tree')
     outside=re.sub(r'<div\b[^>]*class=[\"\']src[\"\'][^>]*>.*?</div>','',text+extra,flags=re.S|re.I)
     if re.search(r'\bL\d{3}\b|\bslides?\s+\d+',plain(outside),re.I): flag('L11','citation outside src div')
     return out

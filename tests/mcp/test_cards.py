@@ -101,3 +101,14 @@ def test_get_cards_revision_matches_snapshot(tmp_path):
     thread.join(2)
     assert result['cards'][0]['fields']['Text']=='{{c1::revision'+str(result['revision'])+'}}'
     s.close()
+
+
+def test_house_style_uses_the_profile_tag_root(tmp_path):
+    s = Service(tmp_path/"work", [tmp_path])  # default profile: tag root #AnkiPlus
+    w = s.store.create("cards")["id"]
+    c = card(tags=["#AnkiPlus::T"])
+    s.save_cards(w, [c], 0)
+    assert "L10" not in {f["code"] for f in s.check_cards(w, house_style=True)["findings"]}
+    s.save_cards(w, [{**c, "tags": ["#Other::T"]}], 1)
+    assert "L10" in {f["code"] for f in s.check_cards(w, house_style=True)["findings"]}
+    s.close()

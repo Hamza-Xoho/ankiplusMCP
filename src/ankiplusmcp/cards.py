@@ -61,7 +61,7 @@ class Cards:
                 for message in io_errors(card['fields']):
                     finding('IO',message)
             if house_style:
-                findings.extend(dict(f,card_id=card['id']) for f in lint(card))
+                findings.extend(dict(f,card_id=card['id']) for f in lint(card,tag_root=self.profile.tag_root))
         coverage_result=None
         if coverage:
             from cards.check.coverage import summarize
@@ -119,11 +119,11 @@ class Cards:
                 prefix=f'previews/{uuid.uuid4().hex}'
                 build=self.store.path(workspace,prefix); build.mkdir(parents=True)
                 self.store.write_json(workspace,prefix+'/input.json',rows)
-                from cards.common.files import _write
-                _write(build/'input.jsonl',''.join(__import__('json').dumps(row)+'\n' for row in rows))
+                from cards.common.files import atomic_write
+                atomic_write(build/'input.jsonl',''.join(__import__('json').dumps(row)+'\n' for row in rows))
                 if css is not None:
                     (build/'model').mkdir()
-                    for name,body in [('front.html',''),('back.html',''),('style.css',css)]: _write(build/'model'/name,body)
+                    for name,body in [('front.html',''),('back.html',''),('style.css',css)]: atomic_write(build/'model'/name,body)
                 render.run(SimpleNamespace(build=str(build),anki_html='input.jsonl',only=None,per_sheet=per_sheet))
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
                 manifest=self.store.read_json(workspace,prefix+'/renders/sheets.json')

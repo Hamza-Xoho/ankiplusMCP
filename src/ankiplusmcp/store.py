@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import uuid
 from filelock import FileLock
-from cards.common.files import _write
+from cards.common.files import atomic_write
 
 MAX_FILE = 64 * 1024 * 1024
 
@@ -70,7 +70,7 @@ class Store:
         return resolved
 
     def write_json(self, ident, relative, value):
-        _write(self.path(ident, relative), json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2)+'\n')
+        atomic_write(self.path(ident, relative), json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2)+'\n')
 
     def read_json(self, ident, relative):
         try:

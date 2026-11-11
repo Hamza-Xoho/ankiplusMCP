@@ -81,7 +81,7 @@ def _invalid(field, remedy='repair the figure input and retry'):
     return CardsError('E51', f'figures: line 1 field {field} invalid', remedy)
 
 
-def _regions(raw, keep):
+def parse_regions(raw, keep):
     if not isinstance(raw, list):
         raise _invalid('regions')
     regions = []
@@ -125,12 +125,15 @@ def _regions(raw, keep):
     return regions
 
 
+_regions = parse_regions
+
+
 def _fmt(value):
     text = f'{value:.4f}'.rstrip('0').rstrip('.')
     return text[1:] if text.startswith('0.') else text or '0'
 
 
-def _occlusion(regions, mode):
+def occlusion_markup(regions, mode):
     parts = []
     for region in regions:
         coordinates = ':'.join(f'{key}={_fmt(region[key])}'
@@ -138,6 +141,9 @@ def _occlusion(regions, mode):
         parts.append('{{c%d::image-occlusion:rect:%s:oi=%d}}' %
                      (region['index'], coordinates, mode == 'one'))
     return '<br>'.join(parts) + '<br>'
+
+
+_occlusion = occlusion_markup
 
 
 def _check_output(path):
@@ -154,7 +160,7 @@ def _check_output(path):
     return sidecar
 
 
-def _images(image, regions, media, preview):
+def write_images(image, regions, media, preview):
     from PIL import ImageDraw
     image.save(media, format='PNG')
     preview_image = image.copy()
@@ -171,6 +177,9 @@ def _images(image, regions, media, preview):
         draw.rectangle(box, outline=color, width=4)
         draw.text((box[0], max(0, box[1] - 13)), f'c{index}', fill=color)
     preview_image.save(preview, format='PNG')
+
+
+_images = write_images
 
 
 def run(args):
@@ -218,7 +227,7 @@ def run(args):
     raw = read_json(build.path(region_arg)) if region_arg else figure.get('ocr_labels', [])
     if isinstance(raw, dict):
         raw = raw.get('regions')
-    regions = _regions(raw, getattr(args, 'keep', None))
+    regions = parse_regions(raw, getattr(args, 'keep', None))
     if not regions:
         return Result('FINDINGS', ['OCR found no labels; estimate rectangles by eye and supply --regions.'], [], 1)
     media_relative = f'source/figures/{ident}_io.png'
@@ -234,7 +243,7 @@ def run(args):
     # before rendering and gating so writes need no field repair.
     filename = (f'l{number:03d}_{ident}.png' if number > 0 else f'{ident}.png').lower()
     note = {'kind': 'io', 'notetype': note_type, 'deck': deck,
-            'fields': {'Occlusion': _occlusion(regions, mode),
+            'fields': {'Occlusion': occlusion_markup(regions, mode),
                        'Image': f'<img src="{html.escape(filename, quote=True)}">',
                        'Header': '', 'Back Extra': f'<div class="src">{html.escape(source_tag)}, slide {slide_number}</div>',
                        'Comments': ''},
@@ -263,7 +272,7 @@ def run(args):
         except (OSError, ValueError, UnidentifiedImageError) as exc:
             raise _invalid('figure.image', 'run cards extract to restore a readable image') from exc
         media.parent.mkdir(parents=True, exist_ok=True)
-        _images(image, regions, media, preview)
+        write_images(image, regions, media, preview)
         for path, sidecar in zip((media, preview), sidecars):
             write_json(sidecar, {'file': str(path.relative_to(build.root)),
                        'figure': ident, 'source': str(source.relative_to(build.root)),
