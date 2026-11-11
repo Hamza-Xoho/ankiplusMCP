@@ -7,8 +7,10 @@ The npm launcher (`npx ankiplusmcp`: serve, init, doctor, setup, uninstall) is i
 `pyproject.toml` on the same version. Design: `docs/superpowers/specs/2026-11-10-npx-launcher-design.md`.
 The official Anki MCP is a separate host dependency. Do not add Anki connection,
 proxy or collection mutation code. Keep the host model in control of workflows.
-Use `tests/mcp/` for new MCP tests. Keep `src/cards/`, frozen contract tests,
-`.codex/`, `.agents/` and existing `.claude/` skills unchanged.
+Use `tests/mcp/` for new MCP tests. Frozen: the contract tests in `.codex/contract.sha256`, `.codex/`, `.agents/`
+and existing `.claude/` skills. `src/cards/` source files may change only as an
+approved plan lists (owner's decision, 2026-11-10); the `cards` CLI's output
+must stay byte-identical, checked with `tests/tools/cli_baseline.py compare`.
 The historical phase-building instructions below apply to the legacy CLI,
 not the new independent MCP workspace/API. Approved migration design:
 `docs/superpowers/specs/2026-11-07-ankiplusmcp-design.md`.

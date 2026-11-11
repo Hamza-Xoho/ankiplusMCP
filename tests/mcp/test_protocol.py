@@ -1,4 +1,5 @@
 import asyncio
+import importlib.metadata
 import json
 import os
 import sys
@@ -12,7 +13,8 @@ def test_real_stdio_discovery_cards_errors_and_images(tmp_path):
         params=StdioServerParameters(command=sys.executable,args=['-m','ankiplusmcp','--workspace-root',str(tmp_path/'work'),'--source-root',str(tmp_path)],env={**os.environ,'PYTHONPATH':str(Path(__file__).resolve().parents[2]/'src')})
         async with stdio_client(params) as (read,write):
             async with ClientSession(read,write) as session:
-                await session.initialize()
+                init=await session.initialize()
+                assert init.serverInfo.version == importlib.metadata.version('ankiplusmcp')
                 listed=await session.list_tools(); names={t.name for t in listed.tools}
                 assert {'extract_source','save_cards','render_cards','prepare_write','submit_review','get_image'} <= names
                 assert not {'add_notes','card_suspend','find_notes'} & names

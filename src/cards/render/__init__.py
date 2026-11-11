@@ -52,7 +52,15 @@ def note_pages(build, note, front_template, back_template, css, anki_html):
     return nid, documents
 
 
-def _render(build, prepared, selected):
+def launch_options(browser):
+    if browser == 'chromium':
+        return {}
+    if browser == 'chrome':
+        return {'channel': 'chrome'}
+    return {'executable_path': browser}
+
+
+def _render(build, prepared, selected, browser='chromium'):
     try:
         from playwright.sync_api import sync_playwright, Error
     except ImportError as exc:
@@ -61,7 +69,7 @@ def _render(build, prepared, selected):
         with tempfile.TemporaryDirectory(prefix='.chromium-', dir=build.path('renders')) as profile:
             with sync_playwright() as playwright:
                 context = playwright.chromium.launch_persistent_context(
-                    user_data_dir=profile, headless=True, java_script_enabled=False,
+                    user_data_dir=profile, **launch_options(browser), headless=True, java_script_enabled=False,
                     viewport={'width':390, 'height':40}, service_workers='block',
                     accept_downloads=False, downloads_path=profile, traces_dir=profile)
                 try:
@@ -90,6 +98,56 @@ def _render(build, prepared, selected):
     except Error as exc:
         raise CardsError('E50', f'Chromium render failed: {str(exc).splitlines()[0]}',
                          'run playwright install chromium and check renderer dependencies') from exc
+
+
+def _sheet_plan(build, ids, per_sheet):
+    sheets = []
+    for start in range(0, len(ids), per_sheet):
+        index = len(sheets) + 1
+        sheets.append({'fronts':str(build.path(f'renders/sheets/sheet_{index:02d}_fronts.png')),
+                       'backs':str(build.path(f'renders/sheets/sheet_{index:02d}_backs.png')),
+                       'notes':ids[start:start+per_sheet]})
+    return sheets
+
+
+def _tile_sheets(build, sheets, prepared, selected):
+    by_id = dict(prepared)
+    for sheet in sheets:
+        if not set(sheet['notes']) & selected:
+            continue
+        fronts, backs = [], []
+        for nid in sheet['notes']:
+            for label, _ in by_id[nid]:
+                item = (label.removesuffix('_front').removesuffix('_back'), build.path(f'renders/cards/{label}.png'))
+                (backs if label.endswith('_back') else fronts).append(item)
+        for side, images in [('fronts', fronts), ('backs', backs)]:
+            path = build.path(sheet[side])
+            tile(images, path)
+            artifact_meta(build, str(path.relative_to(build.root)))
+
+
+def render_rows(rows, out_dir, *, css=None, per_sheet=8, browser='chromium'):
+    build = Build(out_dir)
+    if per_sheet < 1:
+        raise CardsError('E50', 'per-sheet: line 1 field value must be positive', 'use --per-sheet 8')
+    if not rows:
+        raise Refused('E50', 'rows: line 1 field drafts empty', 'provide at least one row')
+    if css is None:
+        css = (ASSETS/'style.css').read_text(encoding='utf-8')
+    try:
+        prepared = [note_pages(build, row, '', '', css, True) for row in rows]
+    except (KeyError, TypeError) as exc:
+        raise CardsError('E50', 'rows: line 1 field renderer input invalid', 'supply id, question and answer for every row') from exc
+    ids = [nid for nid, _ in prepared]
+    if len(ids) != len(set(ids)):
+        raise CardsError('E50', 'rows: line 1 field id duplicated', 'use unique note ids')
+    build.path('renders/cards').mkdir(parents=True, exist_ok=True)
+    build.path('renders/sheets').mkdir(parents=True, exist_ok=True)
+    _render(build, prepared, set(ids), browser)
+    sheets = _sheet_plan(build, ids, per_sheet)
+    _tile_sheets(build, sheets, prepared, set(ids))
+    write_json(build.path('renders/sheets.json'), {'sheets': sheets}, 'cards render')
+    return sheets
 
 
 def run(args):
@@ -132,12 +190,7 @@ def run(args):
     selected = set(only.split(',')) if only else set(ids)
     if not selected <= set(ids):
         raise CardsError('E50', 'only: line 1 field id unknown', 'choose active note ids from drafts.jsonl')
-    sheets = []
-    for start in range(0, len(ids), per_sheet):
-        index = len(sheets) + 1
-        sheets.append({'fronts':str(build.path(f'renders/sheets/sheet_{index:02d}_fronts.png')),
-                       'backs':str(build.path(f'renders/sheets/sheet_{index:02d}_backs.png')),
-                       'notes':ids[start:start+per_sheet]})
+    sheets = _sheet_plan(build, ids, per_sheet)
     manifest_path = build.path('renders/sheets.json')
     previous = read_json(manifest_path) if manifest_path.exists() else {}
     if only:
@@ -159,19 +212,7 @@ def run(args):
         for candidate in build.path('renders/cards').iterdir():
             if generated.fullmatch(candidate.name) and candidate.name not in desired:
                 build.path(candidate).unlink()
-    by_id = dict(prepared)
-    for sheet in sheets:
-        if not set(sheet['notes']) & selected:
-            continue
-        fronts, backs = [], []
-        for nid in sheet['notes']:
-            for label, _ in by_id[nid]:
-                item = (label.removesuffix('_front').removesuffix('_back'), build.path(f'renders/cards/{label}.png'))
-                (backs if label.endswith('_back') else fronts).append(item)
-        for side, images in [('fronts', fronts), ('backs', backs)]:
-            path = build.path(sheet[side])
-            tile(images, path)
-            artifact_meta(build, str(path.relative_to(build.root)))
+    _tile_sheets(build, sheets, prepared, selected)
     if not only:
         current = {Path(sheet[side]).name for sheet in sheets for side in ('fronts', 'backs')}
         for candidate in build.path('renders/sheets').iterdir():

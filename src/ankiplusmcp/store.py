@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import uuid
 from filelock import FileLock
-from cards.common.files import _write
+from cards.common.files import atomic_write
 
 MAX_FILE = 64 * 1024 * 1024
 
@@ -70,7 +70,7 @@ class Store:
         return resolved
 
     def write_json(self, ident, relative, value):
-        _write(self.path(ident, relative), json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2)+'\n')
+        atomic_write(self.path(ident, relative), json.dumps(value, ensure_ascii=False, allow_nan=False, indent=2)+'\n')
 
     def read_json(self, ident, relative):
         try:
@@ -117,7 +117,6 @@ class Store:
             local.chmod(0o444)
             manifest['source'] = {'path':str(local), 'original':str(source) if source else None,
                                   'name':source.name if source else 'pasted.txt', 'sha256':digest(local)}
-            self.write_json(ident, 'engine/build.json', {'source':{'path':str(local),'sha256':digest(local),'kind':'pdf' if local.suffix=='.pdf' else 'text'}})
         self.write_json(ident, 'workspace.json', manifest)
         return manifest
 

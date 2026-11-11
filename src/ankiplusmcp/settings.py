@@ -45,7 +45,7 @@ PROFILES = {
     'coldrecall': Profile('coldrecall', 'ColdRecall Cloze', '#ColdRecall'),
 }
 CONFIG_ENV = 'ANKIPLUS_CONFIG'
-CONFIG_KEYS = {'profile', 'note_type', 'tag_root'}
+CONFIG_KEYS = {'profile', 'note_type', 'tag_root', 'browser'}
 
 
 def default_config_path() -> Path:
@@ -79,3 +79,29 @@ def load_profile(profile_flag, config_path, env) -> Profile:
     if any(not isinstance(value, str) or not value.strip() for value in overrides.values()):
         raise ValueError(f'note_type and tag_root in {path} must be non-empty text.')
     return replace(_named(data.get('profile', 'default')), **overrides)
+
+
+BROWSER_CHOICES = ('auto', 'chromium', 'chrome')
+
+
+def _valid_browser(value, origin):
+    if isinstance(value, str) and (value in BROWSER_CHOICES or (Path(value).is_absolute() and Path(value).is_file())):
+        return value
+    raise ValueError(f'Invalid browser {value!r} from {origin}; use auto, chromium, chrome, or the absolute path of an existing browser program.')
+
+
+def load_browser(browser_flag, config_path, env) -> str:
+    """A --browser flag wins outright; otherwise the config file; otherwise `auto`."""
+    if browser_flag:
+        return _valid_browser(browser_flag, '--browser')
+    explicit = config_path or (Path(env[CONFIG_ENV]) if env.get(CONFIG_ENV) else None)
+    path = explicit or default_config_path()
+    if not Path(path).is_file():
+        if explicit:
+            raise ValueError(f'Config file not found: {explicit}')
+        return 'auto'
+    try:
+        data = tomllib.loads(Path(path).read_text(encoding='utf-8'))
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f'Config file {path} is not valid TOML: {exc}') from exc
+    return _valid_browser(data['browser'], str(path)) if 'browser' in data else 'auto'

@@ -1,6 +1,5 @@
 """Standalone card persistence, checks and previews; no mandatory lecture state."""
 from pathlib import Path
-from types import SimpleNamespace
 import uuid
 from .models import Card
 from .store import DomainError, digest
@@ -61,10 +60,11 @@ class Cards:
                 for message in io_errors(card['fields']):
                     finding('IO',message)
             if house_style:
-                findings.extend(dict(f,card_id=card['id']) for f in lint(card))
+                findings.extend(dict(f,card_id=card['id']) for f in lint(card,tag_root=self.profile.tag_root))
         coverage_result=None
         if coverage:
             from cards.check.coverage import summarize
+            self.require_extraction(workspace,'coverage')   # objectives.json exists only once labels are read
             data=self.store.read_json(workspace,self.engine(workspace)+'/source/slides.json')
             objectives=self.store.read_json(workspace,self.engine(workspace)+'/source/objectives.json')['objectives']
             skips=self.store.read_json(workspace,'omissions.json') if self.store.path(workspace,'omissions.json').exists() else []
@@ -76,12 +76,12 @@ class Cards:
                 'source_accuracy_verified':False}
 
     def render_cards(self, workspace, ids=None, front=None, back=None, css=None, per_sheet=8, desktop_sample=0, light=False):
-        doctor.require('chromium')
+        browser=doctor.require_browser(self.browser)
         with self.store.lock(workspace):
             selected=self._select(workspace,ids)
             if not selected: raise DomainError('CARD','No cards to render.','Save cards first.')
             revision=self.store.get(workspace)['revision']
-        def run(cancel):
+        def run(cancel, report):
             from cards import render
             from cards.render.templates import CLOZE, fill, page
             from cards.render.occlusion import bodies
@@ -119,17 +119,11 @@ class Cards:
                 prefix=f'previews/{uuid.uuid4().hex}'
                 build=self.store.path(workspace,prefix); build.mkdir(parents=True)
                 self.store.write_json(workspace,prefix+'/input.json',rows)
-                from cards.common.files import _write
-                _write(build/'input.jsonl',''.join(__import__('json').dumps(row)+'\n' for row in rows))
-                if css is not None:
-                    (build/'model').mkdir()
-                    for name,body in [('front.html',''),('back.html',''),('style.css',css)]: _write(build/'model'/name,body)
-                render.run(SimpleNamespace(build=str(build),anki_html='input.jsonl',only=None,per_sheet=per_sheet))
+                sheets_abs=render.render_rows(rows,build,css=css,per_sheet=per_sheet,browser=browser)
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
-                manifest=self.store.read_json(workspace,prefix+'/renders/sheets.json')
-                sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in manifest['sheets']]
+                sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in sheets_abs]
                 from .variants import samples
-                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel)
+                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,browser)
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
                 result={'_committed':True,'samples':variants,'sheets':sheets,'cards_sha256':digest(self.store.path(workspace,'cards.json')),'selected_ids':[c['id'] for c in selected],'card_revision':revision,'prefix':prefix,'approximation': 'Local inert template rendering; custom Anki filters/add-on JavaScript are not executed.'}
                 self.store.write_json(workspace,'latest-preview.json',result)

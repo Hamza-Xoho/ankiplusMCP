@@ -67,9 +67,33 @@ npx -y github:Hamza-Xoho/ankiplusMCP#v0.2.0 uninstall   # remove exactly what in
 ```
 
 OCR needs the Tesseract program (`brew install tesseract`, or
-`sudo apt-get install -y tesseract-ocr`). Card previews need Chromium, which
-`setup` installs. Everything else works without either, and a tool that needs
-a missing one returns a `DEPENDENCY` error naming the fix.
+`sudo apt-get install -y tesseract-ocr`). Card previews need a browser: either
+Chromium, which `setup` installs, or Google Chrome. If Google Chrome is
+installed, you do not need to run `setup`. Everything else works without
+either, and a tool that needs a missing one returns a `DEPENDENCY` error naming
+the fix.
+
+### Choosing the preview browser
+
+By default (`auto`) the server uses Playwright's Chromium when it is installed,
+and otherwise Google Chrome. To choose, pass `--browser` to `serve`, `doctor`
+or `setup`, or set `browser` in `config.toml`. The flag wins over the file.
+All three also take `--config` to name the config file. `setup` downloads
+Chromium only when the chosen setting finds no browser.
+
+| Value | Meaning |
+| --- | --- |
+| `auto` | Chromium if installed, else Google Chrome. The default. |
+| `chromium` | Only Playwright's Chromium. |
+| `chrome` | Only the installed Google Chrome. |
+| An absolute path | That browser program. The file must exist. |
+
+```toml
+browser = "chrome"
+```
+
+`doctor` shows which browser it found, and `setup --json` and the
+`capabilities` tool report it too.
 
 ### Without npx
 

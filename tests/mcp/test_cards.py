@@ -57,6 +57,17 @@ def test_validation_and_results_are_honest(tmp_path):
     s.close()
 
 
+def test_render_leaves_no_fake_build_inputs(tmp_path):
+    s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('cards')['id']
+    s.save_cards(w,[card()],0)
+    result=wait(s,w,s.render_cards(w,css='.card{color:red}'))
+    folder=s.store.path(w,result['prefix'])
+    assert (folder/'input.json').is_file()
+    assert not (folder/'input.jsonl').exists() and not (folder/'model').exists()
+    assert s.image_bytes(w,result['sheets'][0]['fronts']).startswith(b'\x89PNG')
+    s.close()
+
+
 def test_visual_review_uses_card_hash_not_unrelated_revision(tmp_path):
     s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('cards')['id']
     s.save_cards(w,[card()],0)
@@ -100,4 +111,36 @@ def test_get_cards_revision_matches_snapshot(tmp_path):
     result=s.get_cards(w)
     thread.join(2)
     assert result['cards'][0]['fields']['Text']=='{{c1::revision'+str(result['revision'])+'}}'
+    s.close()
+
+
+def test_house_style_uses_the_profile_tag_root(tmp_path):
+    s = Service(tmp_path/"work", [tmp_path])  # default profile: tag root #AnkiPlus
+    w = s.store.create("cards")["id"]
+    c = card(tags=["#AnkiPlus::T"])
+    s.save_cards(w, [c], 0)
+    assert "L10" not in {f["code"] for f in s.check_cards(w, house_style=True)["findings"]}
+    s.save_cards(w, [{**c, "tags": ["#Other::T"]}], 1)
+    assert "L10" in {f["code"] for f in s.check_cards(w, house_style=True)["findings"]}
+    s.close()
+
+
+def test_render_without_any_browser_fails_before_a_job(tmp_path, monkeypatch):
+    from ankiplusmcp import doctor
+    monkeypatch.setattr(doctor, 'have', lambda name: False)
+    monkeypatch.setattr(doctor, 'system_chrome', lambda: None)
+    s=Service(tmp_path/'work',[tmp_path],browser='chrome'); w=s.store.create('cards')['id']
+    s.save_cards(w,[card()],0)
+    with pytest.raises(DomainError) as e: s.render_cards(w)
+    assert e.value.code=='DEPENDENCY' and 'Chrome' in e.value.message
+    s.close()
+
+
+def test_render_with_system_chrome(tmp_path):
+    from ankiplusmcp import doctor
+    if not doctor.system_chrome(): pytest.skip('Google Chrome is not installed')
+    s=Service(tmp_path/'work',[tmp_path],browser='chrome'); w=s.store.create('cards')['id']
+    s.save_cards(w,[card()],0)
+    result=wait(s,w,s.render_cards(w))
+    assert s.image_bytes(w,result['sheets'][0]['fronts']).startswith(b'\x89PNG')
     s.close()

@@ -139,9 +139,43 @@ The skill reads the map, then pulls only the slides it needs with
 model's context. Flagged slides that need a look get a page image
 (`--page-image N`), and only those images are opened.
 
-Cold extraction is the slow step: OCR and rendering dominate, and a 60-slide
-lecture can take minutes. The requirement is under 60 seconds, which is not met
-yet.
+Cold extraction is the slow step, and OCR dominates it. OCR runs on a thread
+pool (one worker per core by default). The MCP server also passes an OCR cache
+that remembers results by image content, so a repeat run there skips OCR. The
+`cards` CLI passes no cache, so each CLI run does its OCR again. Measured on a synthetic 12-page PDF with one 1400x900
+labelled figure per page (8 cores, Tesseract 5.5.4): rendering takes 0.08 s per
+figure; OCR takes 13.9 s per figure on one worker; a cold `extract_source` takes
+52.4 s; a repeat into a new folder with the same cache takes 1.2 s. These
+numbers are synthetic. `tests/tools/time_extract.py` reproduces them. An
+earlier document gave 220 s for cold extraction of one fixture, measured before
+these changes. That fixture has not been re-measured, and the two numbers are
+not comparable.
+
+In the MCP server the text comes first and the figure labels follow. When every
+slide is read and every figure crop is saved, and before OCR starts, the core
+writes an early `map.md` and `slides_summary.json`. In them every figure says
+"labels pending". The job's progress then names the map's path and says it is
+readable now. Until OCR ends:
+
+- `read_source`, `search_source` and `get_page_image` work as usual.
+- `read_artifact` reads the early map at the same path the finished job
+  returns, and adds `labels_pending: true`.
+- `list_figures` and `get_figure` return each figure with `ocr_labels: null`
+  (not yet read, unlike `[]`, read and none found) and `labels_pending: true`.
+  Crops are readable.
+- `check_cards` with `coverage` refuses with `LABELS_PENDING` and names the
+  job. It needs the finished extraction. Retry when the job completes.
+
+When OCR ends the final map and summary replace the early ones, and they are
+the same files the CLI writes. A published extraction always wins over the
+early text. The early text is used only while its job is queued or running.
+The CLI writes no early map.
+
+The `cards` core is callable through typed functions such as
+`cards.extract.extract_source` and `cards.extract.ocr_figures`. The MCP server
+calls these directly. It does not build argument objects or write `build.json`
+to reach the core. The one exception is `measure_usage` in `sources.py`, which
+still builds an argument object and leaves the MCP in a later piece.
 
 ## 7. Drafting and checking
 
@@ -289,8 +323,12 @@ packaged copies match the skill copies.
 These are recorded in [`decisions.md`](decisions.md) and are not hidden by the
 tests.
 
-- **Performance.** Cold extraction of one fixture took 220 s. The 60-second
-  target is not met.
+- **Performance.** Cold extraction of a synthetic 12-page PDF takes 52.4 s on
+  8 cores. This is the only data point. The 60-second target was set for a real
+  lecture of about 60 slides and is untested on real lectures. The earlier 220 s
+  figure was measured on one fixture before these changes; that fixture has not
+  been re-measured, and the two numbers are not comparable. Label recall is
+  unchanged by construction, because the OCR settings did not change.
 - **Image occlusion.** Output quality has been checked on few lectures, and
   one earlier run produced no occlusion notes for a figure-heavy lecture. Check
   C05 now flags that case.

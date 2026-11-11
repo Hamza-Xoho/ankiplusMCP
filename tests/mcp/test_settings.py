@@ -29,3 +29,18 @@ def test_no_roots_gives_source_error_naming_the_flag(tmp_path):
     f = tmp_path/'a.txt'; f.write_text('x')
     with pytest.raises(DomainError) as e: store.source(str(f))
     assert e.value.code == 'SOURCE' and '--source-root' in e.value.remedy
+
+
+def test_load_browser(tmp_path, monkeypatch):
+    import pytest
+    from ankiplusmcp import settings
+    monkeypatch.setattr(settings, 'default_config_path', lambda: tmp_path/'absent.toml')  # never the real user's file
+    assert settings.load_browser(None, None, {}) == 'auto'
+    cfg = tmp_path/'c.toml'; cfg.write_text('browser = "chrome"\n')
+    assert settings.load_browser(None, cfg, {}) == 'chrome'
+    assert settings.load_browser('chromium', cfg, {}) == 'chromium'
+    exe = tmp_path/'chrome'; exe.write_text('')
+    assert settings.load_browser(str(exe), None, {}) == str(exe)
+    for bad in ('firefox', 'relative/chrome', str(tmp_path/'missing')):
+        with pytest.raises(ValueError): settings.load_browser(bad, None, {})
+    assert settings.load_profile(None, cfg, {}).name == 'default'   # the key is accepted

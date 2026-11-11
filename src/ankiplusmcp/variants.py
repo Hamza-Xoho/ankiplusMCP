@@ -2,17 +2,17 @@
 from cards.render.templates import page
 from cards.common.paths import Build
 
-def samples(store, workspace, prefix, rows, css, desktop_sample, light, cancel):
+def samples(store, workspace, prefix, rows, css, desktop_sample, light, cancel, browser='chromium'):
     if not desktop_sample and not light: return []
     from playwright.sync_api import sync_playwright
-    from cards.render import ASSETS
+    from cards.render import ASSETS, launch_options
     from PIL import Image
     css=css if css is not None else (ASSETS/'style.css').read_text()
     result=[]
     with sync_playwright() as p:
-        browser=p.chromium.launch(headless=True)
+        chromium=p.chromium.launch(headless=True,**launch_options(browser))
         try:
-            context=browser.new_context(java_script_enabled=False,service_workers='block',accept_downloads=False)
+            context=chromium.new_context(java_script_enabled=False,service_workers='block',accept_downloads=False)
             context.route('**/*',lambda route:route.abort())
             tab=context.new_page()
             for variant,width,count in [('desktop',1024,desktop_sample),('light',390,min(3,len(rows)) if light else 0)]:
@@ -28,5 +28,5 @@ def samples(store, workspace, prefix, rows, css, desktop_sample, light, cancel):
                     with Image.open(store.path(workspace,relative)) as im:
                         if im.width>width: im.crop((0,0,width,im.height)).save(store.path(workspace,relative))
                     result.append(relative)
-        finally: browser.close()
+        finally: chromium.close()
     return result
