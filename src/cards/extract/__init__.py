@@ -1,5 +1,6 @@
 """Source extraction orchestration; no model or network calls."""
 from concurrent.futures import ThreadPoolExecutor
+from collections.abc import Callable
 from dataclasses import dataclass
 import hashlib
 import threading
@@ -37,12 +38,15 @@ def run(args):
         [f"{found.slide_count} slides · {found.figure_count} figures · {found.flagged} flagged · {found.objective_count} objectives"],
         [found.map],1 if findings else 0)
 
-def extract_source(source, out_dir, slides=None, *, on_progress=None, should_cancel=None):
+def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
+                   on_progress: Callable[[str, int, int | None], None] | None = None,
+                   should_cancel: Callable[[], bool] | None = None) -> Extraction:
     """Extract `source` into `out_dir/source`; reads no build.json.
 
     on_progress('slides', done, None) follows each slide read; on_progress('figures', done, total)
     follows each figure's OCR, where total counts the figures found so far. should_cancel is asked
-    after each slide and before each figure's OCR."""
+    after each slide and before each figure's OCR. Both callbacks are called from the main thread
+    and from OCR worker threads, so they must be thread-safe and quick."""
     path = Path(source)
     build = Build(out_dir)
     spec = slides

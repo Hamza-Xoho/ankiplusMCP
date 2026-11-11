@@ -9,7 +9,7 @@ def slice_text(data, numbers):
     return '\n\n'.join(f"## Slide {s['n']} — {s['title']}\n{s['text']}"
                        for s in data['slides'] if s['n'] in numbers)
 
-def page_image(pdf, out, page):
+def page_image(pdf: Path, out: Path, page: int) -> Path:
     """Render one PDF page to `out` (1,000 pixels on its longest side) and return `out`."""
     pdf, out = Path(pdf), Path(out)
     if pdf.suffix.lower()!='.pdf':

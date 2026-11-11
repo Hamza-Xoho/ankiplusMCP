@@ -81,8 +81,8 @@ def test_completed_source_extraction_is_reused(tmp_path,monkeypatch):
     import cards.extract
     s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('lecture',text='# One\nFirst fact')['id']
     wait(s,w,s.extract_source(w))
-    def no_reextract(args): raise AssertionError('Completed source should be cached')
-    monkeypatch.setattr(cards.extract,'run',no_reextract)
+    def no_reextract(*args,**kwargs): raise AssertionError('Completed source should be cached')
+    monkeypatch.setattr(cards.extract,'extract_source',no_reextract)
     result=wait(s,w,s.extract_source(w))
     assert result['cached'] is True
     s.close()
