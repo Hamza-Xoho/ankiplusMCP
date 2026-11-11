@@ -117,7 +117,6 @@ class Store:
             local.chmod(0o444)
             manifest['source'] = {'path':str(local), 'original':str(source) if source else None,
                                   'name':source.name if source else 'pasted.txt', 'sha256':digest(local)}
-            self.write_json(ident, 'engine/build.json', {'source':{'path':str(local),'sha256':digest(local),'kind':'pdf' if local.suffix=='.pdf' else 'text'}})
         self.write_json(ident, 'workspace.json', manifest)
         return manifest
 

@@ -86,3 +86,11 @@ def test_completed_source_extraction_is_reused(tmp_path,monkeypatch):
     result=wait(s,w,s.extract_source(w))
     assert result['cached'] is True
     s.close()
+
+
+def test_workspace_has_no_fake_build_json(tmp_path):
+    s = Service(tmp_path/'work', [tmp_path])
+    w = s.store.create('lecture', text='# A\n\nSodium crosses channels.\n')['id']
+    wait(s, w, s.extract_source(w))
+    assert not list((tmp_path/'work').rglob('build.json'))
+    s.close()

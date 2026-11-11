@@ -41,8 +41,8 @@ class Sources:
                                 if info.get('width',0)*info.get('height',0)>20_000_000:
                                     raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
                 prefix=f'extractions/{uuid.uuid4().hex}/engine'
-                self.store.write_json(workspace,prefix+'/build.json',{'source':{'path':str(path),'sha256':state['source']['sha256'],'kind':'pdf' if path.suffix=='.pdf' else 'text'}})
-                try: extract.run(SimpleNamespace(build=str(self.store.path(workspace,prefix)), slides=slides))
+                try: extract.extract_source(path, self.store.path(workspace,prefix), slides, should_cancel=cancel)
+                except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
                 except Exception as exc:
                     # The extractor reports a missing OCR program as its own E24; name the fix instead.
                     if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
@@ -67,10 +67,12 @@ class Sources:
         return {'hits':hits[offset:offset+limit], 'total':len(hits), 'next_offset':offset+limit if offset+limit<len(hits) else None}
 
     def get_page_image(self, workspace, page):
-        from cards import source
-        with self.store.edit(workspace):
+        from cards.source import page_image
+        with self.store.edit(workspace) as state:
             prefix=self.engine(workspace)
-            source.run(SimpleNamespace(build=str(self.store.path(workspace,prefix)),page_image=page))
+            data=self.store.read_json(workspace,prefix+'/source/slides.json')
+            selection(str(page),[s['n'] for s in data['slides']])
+            page_image(Path(state['source']['path']),self.store.path(workspace,f'{prefix}/source/pages/p{page:02d}.png'),page)
         return {'artifact':f'{prefix}/source/pages/p{page:02d}.png'}
 
     def list_figures(self, workspace, offset=0, limit=20):

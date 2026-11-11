@@ -23,10 +23,10 @@ def test_cancelled_extraction_preserves_current_source_and_revision(tmp_path,mon
     s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('lecture',text='# One\nFirst fact\n\f\n# Two\nSecond fact')['id']
     wait(s,w,s.extract_source(w,'1'))
     before=s.read_source(w); revision=s.store.get(w)['revision']
-    entered=threading.Event(); release=threading.Event(); native=cards.extract.run
-    def paused(args):
-        result=native(args); entered.set(); release.wait(3); return result
-    monkeypatch.setattr(cards.extract,'run',paused)
+    entered=threading.Event(); release=threading.Event(); native=cards.extract.extract_source
+    def paused(*args,**kwargs):
+        result=native(*args,**kwargs); entered.set(); release.wait(3); return result
+    monkeypatch.setattr(cards.extract,'extract_source',paused)
     job=s.extract_source(w,'2'); assert entered.wait(2)
     s.jobs.cancel(w,job['id']); release.set(); s.jobs.close()
     assert s.jobs.get(w,job['id'])['status']=='cancelled'
