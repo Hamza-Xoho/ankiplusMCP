@@ -94,9 +94,9 @@ jobs:
           npm pack
       - name: End to end through npx, uv and the built wheel
         run: |
-          export ANKIPLUSMCP_PY_SPEC="ankiplusmcp[all] @ file://$PWD/dist/ankiplusmcp-0.2.0-py3-none-any.whl"
+          export ANKIPLUSMCP_PY_SPEC="ankiplusmcp[all] @ file://$PWD/dist/ankiplusmcp-0.3.0-py3-none-any.whl"
           # A bare path would be run as a command; --package installs the tarball.
-          package="file:$PWD/ankiplusmcp-0.2.0.tgz"
+          package="file:$PWD/ankiplusmcp-0.3.0.tgz"
           smoke="$PWD/scripts/smoke-mcp.py"
           work="$(mktemp -d)"
           cd "$work"

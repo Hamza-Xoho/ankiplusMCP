@@ -11,7 +11,7 @@ RUN = [sys.executable, '-m', 'ankiplusmcp']
 
 def test_version_line():
     out = subprocess.run(RUN + ['--version'], capture_output=True, text=True)
-    assert out.returncode == 0 and out.stdout.strip() == 'ankiplusmcp 0.2.0'
+    assert out.returncode == 0 and out.stdout.strip() == 'ankiplusmcp 0.3.0'
 
 
 def test_doctor_json_shape_and_exit_codes(tmp_path):

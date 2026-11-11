@@ -23,7 +23,7 @@ supported; Windows is untested.
 Register the server in your AI host with one command:
 
 ```sh
-npx -y github:Hamza-Xoho/ankiplusMCP#v0.2.0 init --host claude-code --source-root /absolute/lectures
+npx -y github:Hamza-Xoho/ankiplusMCP#v0.3.0 init --host claude-code --source-root /absolute/lectures
 ```
 
 `init` shows every change before it makes it, backs up any file it edits, and
@@ -61,9 +61,9 @@ others as untested until you have run them once.
 The other commands:
 
 ```sh
-npx -y github:Hamza-Xoho/ankiplusMCP#v0.2.0 doctor      # what is missing, and the command that fixes it
-npx -y github:Hamza-Xoho/ankiplusMCP#v0.2.0 setup       # download Chromium for card previews (asks first)
-npx -y github:Hamza-Xoho/ankiplusMCP#v0.2.0 uninstall   # remove exactly what init added
+npx -y github:Hamza-Xoho/ankiplusMCP#v0.3.0 doctor      # what is missing, and the command that fixes it
+npx -y github:Hamza-Xoho/ankiplusMCP#v0.3.0 setup       # download Chromium for card previews (asks first)
+npx -y github:Hamza-Xoho/ankiplusMCP#v0.3.0 uninstall   # remove exactly what init added
 ```
 
 OCR needs the Tesseract program (`brew install tesseract`, or
@@ -101,7 +101,7 @@ The launcher only finds uv and starts the Python program. You can do that
 yourself:
 
 ```sh
-uvx --from "ankiplusmcp[all] @ git+https://github.com/Hamza-Xoho/ankiplusMCP@v0.2.0" ankiplusmcp --source-root /absolute/lectures
+uvx --from "ankiplusmcp[all] @ git+https://github.com/Hamza-Xoho/ankiplusMCP@v0.3.0" ankiplusmcp --source-root /absolute/lectures
 ```
 
 The server speaks MCP over stdio. It is not an HTTP server and opens no port.

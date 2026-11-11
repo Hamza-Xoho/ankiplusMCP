@@ -9,7 +9,7 @@ cv = importlib.util.module_from_spec(spec); spec.loader.exec_module(cv)
 
 def test_repo_versions_agree():
     v = cv.versions(ROOT)
-    assert v['package.json'] == v['pyproject.toml'] == '0.2.0'
+    assert v['package.json'] == v['pyproject.toml'] == '0.3.0'
 
 
 def test_mismatch_is_reported(tmp_path):
