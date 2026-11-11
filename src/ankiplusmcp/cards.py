@@ -1,6 +1,5 @@
 """Standalone card persistence, checks and previews; no mandatory lecture state."""
 from pathlib import Path
-from types import SimpleNamespace
 import uuid
 from .models import Card
 from .store import DomainError, digest
@@ -119,17 +118,11 @@ class Cards:
                 prefix=f'previews/{uuid.uuid4().hex}'
                 build=self.store.path(workspace,prefix); build.mkdir(parents=True)
                 self.store.write_json(workspace,prefix+'/input.json',rows)
-                from cards.common.files import atomic_write
-                atomic_write(build/'input.jsonl',''.join(__import__('json').dumps(row)+'\n' for row in rows))
-                if css is not None:
-                    (build/'model').mkdir()
-                    for name,body in [('front.html',''),('back.html',''),('style.css',css)]: atomic_write(build/'model'/name,body)
-                render.run(SimpleNamespace(build=str(build),anki_html='input.jsonl',only=None,per_sheet=per_sheet))
+                sheets_abs=render.render_rows(rows,build,css=css,per_sheet=per_sheet,browser='chromium')
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
-                manifest=self.store.read_json(workspace,prefix+'/renders/sheets.json')
-                sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in manifest['sheets']]
+                sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in sheets_abs]
                 from .variants import samples
-                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel)
+                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,'chromium')
                 if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
                 result={'_committed':True,'samples':variants,'sheets':sheets,'cards_sha256':digest(self.store.path(workspace,'cards.json')),'selected_ids':[c['id'] for c in selected],'card_revision':revision,'prefix':prefix,'approximation': 'Local inert template rendering; custom Anki filters/add-on JavaScript are not executed.'}
                 self.store.write_json(workspace,'latest-preview.json',result)

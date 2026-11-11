@@ -66,3 +66,22 @@ def test_text_ready_fires_once_before_ocr_and_not_on_cache_hit(tmp_path):
     assert len(seen) == 1 and seen[0]['slides'][0]['text']
     extract_source(src, tmp_path/'out', on_text_ready=seen.append)
     assert len(seen) == 1
+
+
+def test_launch_options():
+    from cards.render import launch_options
+    assert launch_options('chromium') == {}
+    assert launch_options('chrome') == {'channel': 'chrome'}
+    assert launch_options('/opt/chrome/chrome') == {'executable_path': '/opt/chrome/chrome'}
+
+
+def test_render_rows(tmp_path):
+    import json
+    from pathlib import Path
+    from cards.render import render_rows
+    rows = [{'id': 'a', 'question': 'Q1', 'answer': 'A1'}, {'id': 'b', 'question': 'Q2', 'answer': 'A2'}]
+    sheets = render_rows(rows, tmp_path, css='.card{color:red}')
+    assert [s['notes'] for s in sheets] == [['a', 'b']]
+    assert all(Path(s[side]).is_absolute() and Path(s[side]).is_file() for s in sheets for side in ('fronts', 'backs'))
+    assert json.loads((tmp_path/'renders/sheets.json').read_text())['sheets'] == sheets
+    assert not (tmp_path/'model').exists() and not list(tmp_path.glob('*.jsonl'))

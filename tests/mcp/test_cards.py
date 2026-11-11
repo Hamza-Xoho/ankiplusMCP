@@ -57,6 +57,17 @@ def test_validation_and_results_are_honest(tmp_path):
     s.close()
 
 
+def test_render_leaves_no_fake_build_inputs(tmp_path):
+    s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('cards')['id']
+    s.save_cards(w,[card()],0)
+    result=wait(s,w,s.render_cards(w,css='.card{color:red}'))
+    folder=s.store.path(w,result['prefix'])
+    assert (folder/'input.json').is_file()
+    assert not (folder/'input.jsonl').exists() and not (folder/'model').exists()
+    assert s.image_bytes(w,result['sheets'][0]['fronts']).startswith(b'\x89PNG')
+    s.close()
+
+
 def test_visual_review_uses_card_hash_not_unrelated_revision(tmp_path):
     s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('cards')['id']
     s.save_cards(w,[card()],0)
