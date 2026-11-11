@@ -140,8 +140,9 @@ model's context. Flagged slides that need a look get a page image
 (`--page-image N`), and only those images are opened.
 
 Cold extraction is the slow step, and OCR dominates it. OCR runs on a thread
-pool (one worker per core by default) and remembers results by image content,
-so a repeat run skips it. Measured on a synthetic 12-page PDF with one 1400x900
+pool (one worker per core by default). The MCP server also passes an OCR cache
+that remembers results by image content, so a repeat run there skips OCR. The
+`cards` CLI passes no cache, so each CLI run does its OCR again. Measured on a synthetic 12-page PDF with one 1400x900
 labelled figure per page (8 cores, Tesseract 5.5.4): rendering takes 0.08 s per
 figure; OCR takes 13.9 s per figure on one worker; a cold `extract_source` takes
 52.4 s; a repeat into a new folder with the same cache takes 1.2 s. These
@@ -149,6 +150,26 @@ numbers are synthetic. `tests/tools/time_extract.py` reproduces them. An
 earlier document gave 220 s for cold extraction of one fixture, measured before
 these changes. That fixture has not been re-measured, and the two numbers are
 not comparable.
+
+In the MCP server the text comes first and the figure labels follow. When every
+slide is read and every figure crop is saved, and before OCR starts, the core
+writes an early `map.md` and `slides_summary.json`. In them every figure says
+"labels pending". The job's progress then names the map's path and says it is
+readable now. Until OCR ends:
+
+- `read_source`, `search_source` and `get_page_image` work as usual.
+- `read_artifact` reads the early map at the same path the finished job
+  returns, and adds `labels_pending: true`.
+- `list_figures` and `get_figure` return each figure with `ocr_labels: null`
+  (not yet read, unlike `[]`, read and none found) and `labels_pending: true`.
+  Crops are readable.
+- `check_cards` with `coverage` refuses with `LABELS_PENDING` and names the
+  job. It needs the finished extraction. Retry when the job completes.
+
+When OCR ends the final map and summary replace the early ones, and they are
+the same files the CLI writes. A published extraction always wins over the
+early text. The early text is used only while its job is queued or running.
+The CLI writes no early map.
 
 The `cards` core is callable through typed functions such as
 `cards.extract.extract_source` and `cards.extract.ocr_figures`. The MCP server
