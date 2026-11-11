@@ -46,7 +46,7 @@ class Sources:
             prefix=f'extractions/{uuid.uuid4().hex}/engine'
             def progress(kind, done, total):
                 report(f'slides {done}' if kind=='slides' else f'figures {done}/{total}')
-            try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel)
+            try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr')
             except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
             except Exception as exc:
                 # The extractor reports a missing OCR program as its own E24; name the fix instead.

@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Callable
 from dataclasses import dataclass
 import hashlib
+import os
 import threading
 from pathlib import Path
 from ..common.paths import Build
@@ -38,15 +39,76 @@ def run(args):
         [f"{found.slide_count} slides · {found.figure_count} figures · {found.flagged} flagged · {found.objective_count} objectives"],
         [found.map],1 if findings else 0)
 
+def default_workers() -> int:
+    return os.cpu_count() or 4
+
+class OcrFailure(Exception):
+    """OCR of one image failed; `path` names it and `__cause__` holds the error."""
+    def __init__(self, path):
+        super().__init__(str(path))
+        self.path = path
+
+def ocr_figures(paths: list[Path], *, workers: int | None = None, cache_dir: Path | None = None,
+                on_progress: Callable[[int, int], None] | None = None,
+                should_cancel: Callable[[], bool] | None = None) -> dict[Path, dict]:
+    """OCR each distinct image once (by content) on a thread pool, largest first.
+
+    Every path gets its own copy of its group's result. on_progress(done, total) counts figures and
+    is called from the calling thread only. Raises OcrFailure (naming the first path of the failed
+    group) or ExtractionCancelled."""
+    import copy
+    from concurrent.futures import as_completed
+    from PIL import Image
+    from . import ocr
+    groups: dict[str, list[Path]] = {}
+    for p in paths:
+        groups.setdefault(hashlib.sha256(Path(p).read_bytes()).hexdigest(), []).append(p)
+    def area(group):
+        try:
+            with Image.open(group[0]) as image:
+                return image.width*image.height
+        except Exception:
+            return Path(group[0]).stat().st_size
+    ordered = sorted(groups.values(), key=area, reverse=True)
+    stop = threading.Event()
+    def work(group):
+        if stop.is_set(): return None
+        if should_cancel and should_cancel():
+            stop.set()
+            raise ExtractionCancelled()
+        try:
+            return ocr.cached_extract(group[0], cache_dir)
+        except Exception as exc:
+            stop.set()
+            raise OcrFailure(group[0]) from exc
+    results: dict[Path, dict] = {}
+    done = 0
+    with ThreadPoolExecutor(max_workers=max(1, workers or default_workers())) as pool:
+        futures = {pool.submit(work, group): group for group in ordered}
+        try:
+            for future in as_completed(futures):
+                found = future.result()
+                if found is None: continue
+                for p in futures[future]:
+                    results[p] = copy.deepcopy(found)
+                done += len(futures[future])
+                if on_progress: on_progress(done, len(paths))
+        except BaseException:
+            stop.set()
+            raise
+    return {p: results[p] for p in paths}
+
 def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
                    on_progress: Callable[[str, int, int | None], None] | None = None,
-                   should_cancel: Callable[[], bool] | None = None) -> Extraction:
+                   should_cancel: Callable[[], bool] | None = None,
+                   workers: int | None = None, ocr_cache: Path | None = None) -> Extraction:
     """Extract `source` into `out_dir/source`; reads no build.json.
 
     on_progress('slides', done, None) follows each slide read; on_progress('figures', done, total)
-    follows each figure's OCR, where total counts the figures found so far. should_cancel is asked
-    after each slide and before each figure's OCR. Both callbacks are called from the main thread
-    and from OCR worker threads, so they must be thread-safe and quick."""
+    follows each finished OCR group, where total is the number of figures. should_cancel is asked
+    after each slide and before each figure's OCR (from worker threads, so it must be thread-safe
+    and quick); on_progress is only ever called from the calling thread. workers sets the OCR thread
+    count (default: every core); ocr_cache is a folder that remembers OCR results by image content."""
     path = Path(source)
     build = Build(out_dir)
     spec = slides
@@ -70,63 +132,24 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
         slides = [s for s in slides if s['n'] in chosen]
     else:
         raise CardsError('E21',f'{path}: line 1 field source.kind unsupported','use PDF, markdown or text')
-    # Tesseract subprocesses use one OpenMP thread (set per subprocess in OCR).
-    from .ocr import extract
-    cancelled = threading.Event()
-    lock = threading.Lock()
-    progress = {'done':0,'total':0}
-    def work(f):
-        if cancelled.is_set(): return
-        if should_cancel and should_cancel():
-            cancelled.set()
-            raise ExtractionCancelled()
-        try:
-            result = extract(build.path('source/'+f['file']))
-            f['ocr_labels'] = result['regions']
-            f['repeated_labels'] = list(result['repeated'])
-        except Exception as exc:
-            raise CardsError('E24',f"{path}: field {f['fig_id']} OCR failed: {exc}",'install Tesseract and retry extraction') from exc
-        if on_progress:
-            with lock:
-                progress['done'] += 1
-                on_progress('figures',progress['done'],progress['total'])
-    # Render only on the main thread; OCR workers take the largest queued
-    # crops first, avoiding a tail of large late-lecture figures.
-    from queue import PriorityQueue
-    from PIL import Image
-    queue = PriorityQueue()
     records = []
-    def worker():
-        while True:
-            _, _, figure = queue.get()
-            if figure is None:
-                return
-            work(figure)
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        futures = [pool.submit(worker) for _ in range(4)]
-        index = 0
-        try:
-            for slide in slides:
-                records.append(slide)
-                if on_progress: on_progress('slides',len(records),None)
-                if should_cancel and should_cancel():
-                    raise ExtractionCancelled()
-                for figure in slide['figures']:
-                    with Image.open(build.path('source/'+figure['file'])) as image:
-                        area = image.width*image.height
-                    with lock:
-                        progress['total'] += 1
-                    queue.put((-area,index,figure))
-                    index += 1
-        except BaseException:
-            cancelled.set()
-            raise
-        finally:
-            for sentinel in range(4):
-                queue.put((float('inf'),sentinel,None))
-        for future in futures:
-            future.result()
+    for slide in slides:
+        records.append(slide)
+        if on_progress: on_progress('slides',len(records),None)
+        if should_cancel and should_cancel():
+            raise ExtractionCancelled()
     slides = records
+    figures = {build.path('source/'+f['file']): f for s in slides for f in s['figures']}
+    try:
+        found = ocr_figures(list(figures), workers=workers, cache_dir=ocr_cache,
+                            on_progress=(lambda done, total: on_progress('figures',done,total)) if on_progress else None,
+                            should_cancel=should_cancel)
+    except OcrFailure as failure:
+        figure = figures[failure.path]
+        raise CardsError('E24',f"{path}: field {figure['fig_id']} OCR failed: {failure.__cause__}",'install Tesseract and retry extraction') from failure.__cause__
+    for figure_path, figure in figures.items():
+        figure['ocr_labels'] = found[figure_path]['regions']
+        figure['repeated_labels'] = list(found[figure_path]['repeated'])
     if not slides:
         raise CardsError('E21',f'{path}: line 1 field text empty','supply a non-empty lecture source')
     figs = [f for s in slides for f in s['figures']]

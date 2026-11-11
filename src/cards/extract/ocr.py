@@ -2,6 +2,7 @@
 from collections import defaultdict
 
 PSM_MODES = [11, 6, 12, 4]
+CACHE_LIMIT = 2000
 
 
 def _binarise(img, threshold=128, scale=2):
@@ -12,6 +13,9 @@ def _binarise(img, threshold=128, scale=2):
     if scale != 1:
         b = b.resize((b.width * scale, b.height * scale), Image.LANCZOS)
     return b
+
+
+binarise = _binarise
 
 
 def _words(im, psm, min_conf, min_len, encoded=None):
@@ -251,3 +255,60 @@ def extract(path, min_conf=20, min_len=2, pad=0.004, group=True):
                  "authoring. Add any label OCR missed by estimating its rect."),
     }
 
+
+
+words = _words
+
+_VERSION = []
+
+
+def tesseract_version():
+    """First line of `tesseract --version`, cached for the process; 'unknown' if it cannot run."""
+    if not _VERSION:
+        import subprocess
+        try:
+            run = subprocess.run(['tesseract', '--version'], capture_output=True, timeout=30, check=True)
+            text = (run.stdout or run.stderr).decode(errors='replace').strip()
+            _VERSION.append(text.splitlines()[0] if text else 'unknown')
+        except (OSError, subprocess.SubprocessError):
+            _VERSION.append('unknown')
+    return _VERSION[0]
+
+
+def _cache_key():
+    import hashlib
+    return hashlib.sha256(repr((tesseract_version(), PSM_MODES, 20, 2, 0.004, True)).encode()).hexdigest()[:16]
+
+
+def cached_extract(path, cache_dir):
+    """`extract(path)`, remembered in `cache_dir` by image content and OCR settings."""
+    if cache_dir is None:
+        return extract(path)
+    import hashlib
+    import json
+    from pathlib import Path
+    from ..common.files import atomic_write
+    cache_dir = Path(cache_dir)
+    entry = cache_dir / f'{hashlib.sha256(Path(path).read_bytes()).hexdigest()}.{_cache_key()}.json'
+    try:
+        cached = json.loads(entry.read_text(encoding='utf-8'))
+        if isinstance(cached, dict) and 'regions' in cached and 'repeated' in cached:
+            return cached
+    except (OSError, ValueError):
+        pass
+    result = extract(path)
+    try:
+        atomic_write(entry, json.dumps(result, ensure_ascii=False))
+        stale = []
+        for other in cache_dir.glob('*.json'):
+            try:
+                stale.append((other.stat().st_mtime, other.name, other))
+            except OSError:
+                pass
+        stale.sort()
+        for _, _, other in stale[:max(0, len(stale) - CACHE_LIMIT)]:
+            if other != entry:
+                other.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return result

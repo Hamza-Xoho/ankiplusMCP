@@ -156,3 +156,23 @@ def test_two_extractions_at_once_leave_one_complete_result(tmp_path):
     wait(s, w, a); wait(s, w, b)
     engine = s.store.get(w)['source_engine']
     assert s.store.read_json(w, engine + '/source/slides.json')['slide_count'] >= 1; s.close()
+
+
+def test_second_workspace_reuses_ocr_results(tmp_path, monkeypatch):
+    import io, pymupdf
+    from cards.extract import ocr
+    calls = []
+    monkeypatch.setattr(ocr, 'extract', lambda path, **kw: calls.append(1) or {'regions': [], 'repeated': {}})
+    monkeypatch.setattr(ocr, 'tesseract_version', lambda: 'tesseract 5.5.4')
+    buf = io.BytesIO(); Image.new('RGB', (400, 300), 'white').save(buf, 'PNG')
+    pdf = tmp_path/'l.pdf'
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=960, height=540); page.insert_text((40, 40), 'Title')
+        page.insert_image(pymupdf.Rect(100, 80, 860, 520), stream=buf.getvalue()); doc.save(pdf)
+    s = Service(tmp_path/'work', [tmp_path])
+    for _ in range(2):
+        w = s.store.create('lecture', source_path=str(pdf))['id']
+        wait(s, w, s.extract_source(w))
+    assert len(calls) == 1
+    assert s.store.list()['total'] == 2      # the cache folder is not a workspace
+    s.close()
