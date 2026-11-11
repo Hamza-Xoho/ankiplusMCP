@@ -275,14 +275,26 @@ def tesseract_version():
     return _VERSION[0]
 
 
+_DIGEST = []
+
+
+def code_digest():
+    """SHA-256 hex of this file's bytes (cached for the process): any OCR code change changes the cache key."""
+    if not _DIGEST:
+        import hashlib
+        from pathlib import Path
+        _DIGEST.append(hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+    return _DIGEST[0]
+
+
 def _cache_key():
     import hashlib
-    return hashlib.sha256(repr((tesseract_version(), PSM_MODES, 20, 2, 0.004, True)).encode()).hexdigest()[:16]
+    return hashlib.sha256(repr((tesseract_version(), code_digest())).encode()).hexdigest()[:16]
 
 
 def cached_extract(path, cache_dir):
     """`extract(path)`, remembered in `cache_dir` by image content and OCR settings."""
-    if cache_dir is None:
+    if cache_dir is None or tesseract_version() == 'unknown':
         return extract(path)
     import hashlib
     import json
@@ -301,14 +313,15 @@ def cached_extract(path, cache_dir):
         atomic_write(entry, json.dumps(result, ensure_ascii=False))
         stale = []
         for other in cache_dir.glob('*.json'):
+            if other == entry:
+                continue
             try:
                 stale.append((other.stat().st_mtime, other.name, other))
             except OSError:
                 pass
         stale.sort()
-        for _, _, other in stale[:max(0, len(stale) - CACHE_LIMIT)]:
-            if other != entry:
-                other.unlink(missing_ok=True)
+        for _, _, other in stale[:max(0, len(stale) + 1 - CACHE_LIMIT)]:
+            other.unlink(missing_ok=True)
     except OSError:
         pass
     return result
