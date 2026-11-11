@@ -145,12 +145,16 @@ so a repeat run skips it. Measured on a synthetic 12-page PDF with one 1400x900
 labelled figure per page (8 cores, Tesseract 5.5.4): rendering takes 0.08 s per
 figure; OCR takes 13.9 s per figure on one worker; a cold `extract_source` takes
 52.4 s; a repeat into a new folder with the same cache takes 1.2 s. These
-numbers are synthetic. `tests/tools/time_extract.py` reproduces them.
+numbers are synthetic. `tests/tools/time_extract.py` reproduces them. An
+earlier document gave 220 s for cold extraction of one fixture, measured before
+these changes. That fixture has not been re-measured, and the two numbers are
+not comparable.
 
 The `cards` core is callable through typed functions such as
 `cards.extract.extract_source` and `cards.extract.ocr_figures`. The MCP server
 calls these directly. It does not build argument objects or write `build.json`
-to reach the core.
+to reach the core. The one exception is `measure_usage` in `sources.py`, which
+still builds an argument object and leaves the MCP in a later piece.
 
 ## 7. Drafting and checking
 
@@ -299,10 +303,11 @@ These are recorded in [`decisions.md`](decisions.md) and are not hidden by the
 tests.
 
 - **Performance.** Cold extraction of a synthetic 12-page PDF takes 52.4 s on
-  8 cores (an earlier measurement of one different fixture took 220 s). Real
-  lectures are not yet measured. Label recall is unchanged by construction,
-  because the OCR settings did not change. The 60-second target is met only on
-  the synthetic file.
+  8 cores. This is the only data point. The 60-second target was set for a real
+  lecture of about 60 slides and is untested on real lectures. The earlier 220 s
+  figure was measured on one fixture before these changes; that fixture has not
+  been re-measured, and the two numbers are not comparable. Label recall is
+  unchanged by construction, because the OCR settings did not change.
 - **Image occlusion.** Output quality has been checked on few lectures, and
   one earlier run produced no occlusion notes for a figure-heavy lecture. Check
   C05 now flags that case.
