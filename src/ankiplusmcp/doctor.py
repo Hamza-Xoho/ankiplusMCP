@@ -102,8 +102,9 @@ def _writable(path):
     return False
 
 
-def run_checks(workspace_root, browser_setting='auto'):
-    """One record per prerequisite: name, status ok|missing, required, detail, fix."""
+def run_checks(workspace_root, browser_setting='auto', browser_error=None):
+    """One record per prerequisite: name, status ok|missing, required, detail, fix.
+    browser_error is why the configured browser setting could not be read; it fails the chromium check."""
     checks = []
 
     def add(name, ok, required, detail, fix=''):
@@ -121,9 +122,27 @@ def run_checks(workspace_root, browser_setting='auto'):
         'Choose a writable directory with --workspace-root or ANKIPLUS_WORKSPACE_ROOT.')
     found = have('tesseract')
     add('tesseract', found, False, 'available' if found else MISSING['tesseract'], FIXES['tesseract'])
-    browser, detail = describe_browser(browser_setting)
-    add('chromium', browser is not None, False, detail, FIXES['chromium'])
+    if browser_error:
+        add('chromium', False, False, browser_error, 'Correct the browser setting in the config file.')
+    else:
+        browser, detail = describe_browser(browser_setting)
+        add('chromium', browser is not None, False, detail, FIXES['chromium'])
     return checks
+
+
+def _config_arguments(parser):
+    parser.add_argument('--config', default=None, help='Config TOML with browser and other settings. Defaults to ANKIPLUS_CONFIG, then the per-user config directory.')
+    parser.add_argument('--browser', default=None, help='auto, chromium, chrome or a browser program path. Overrides the config file.')
+
+
+def _browser_setting(parser, args):
+    """(setting, error): --browser, then the config file, then auto, as `serve` reads them.
+    A bad --browser flag is a usage error; a problem in the config file comes back as `error`."""
+    if args.browser:
+        try: return settings.load_browser(args.browser, None, os.environ), None
+        except ValueError as exc: parser.error(str(exc))
+    try: return settings.load_browser(None, Path(args.config) if args.config else None, os.environ), None
+    except ValueError as exc: return None, str(exc)
 
 
 def doctor_main(argv):
@@ -131,11 +150,10 @@ def doctor_main(argv):
     parser = argparse.ArgumentParser(prog='ankiplusmcp doctor', description='Check what AnkiPlus MCP needs to run.')
     parser.add_argument('--json', action='store_true', help='Machine-readable output on stdout.')
     parser.add_argument('--workspace-root', default=os.environ.get('ANKIPLUS_WORKSPACE_ROOT') or str(settings.default_workspace_root()))
-    parser.add_argument('--browser', default=None, help='auto, chromium, chrome or a browser program path. Overrides the config file.')
+    _config_arguments(parser)
     args = parser.parse_args(argv)
-    try: browser = settings.load_browser(args.browser, None, os.environ)
-    except ValueError as exc: parser.error(str(exc))
-    checks = run_checks(args.workspace_root, browser)
+    browser, error = _browser_setting(parser, args)
+    checks = run_checks(args.workspace_root, browser, error)
     required_missing = any(c['status'] == 'missing' and c['required'] for c in checks)
     optional_missing = any(c['status'] == 'missing' and not c['required'] for c in checks)
     if args.json:
@@ -155,18 +173,21 @@ def setup_main(argv):
     parser = argparse.ArgumentParser(prog='ankiplusmcp setup', description='Install the Chromium browser used for card previews.')
     parser.add_argument('--yes', action='store_true', help='Do not ask before downloading.')
     parser.add_argument('--json', action='store_true', help='Machine-readable result on stdout.')
+    _config_arguments(parser)
     args = parser.parse_args(argv)
+    setting, error = _browser_setting(parser, args)
+    if error: parser.error(error)
     say = lambda text: print(text, file=sys.stderr)
     if not args.yes and not sys.stdin.isatty():
         say('ankiplusmcp setup: pass --yes to run without a prompt.')
         return 3
-    say('Card previews use a Chromium browser that Playwright downloads into its own cache (roughly 150 MB or more).')
     say('OCR uses Tesseract, which this command cannot install. ' + FIXES['tesseract'])
     code = 0
-    browser, detail = describe_browser('auto')
+    browser, detail = describe_browser(setting)
     if browser:
         say(f'A browser for previews is already available ({detail}); nothing to download.')
     else:
+        say('Card previews use a Chromium browser that Playwright downloads into its own cache (roughly 150 MB or more).')
         if not args.yes and input('Download Chromium now? [y/N] ').strip().lower() not in ('y', 'yes'):
             say('Nothing was downloaded.')
             return 1
@@ -180,7 +201,7 @@ def setup_main(argv):
             code = subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], stdout=sys.stderr).returncode
     if args.json:
         tesseract = have('tesseract')
-        browser = resolve_browser('auto')
+        browser = resolve_browser(setting)
         print(json.dumps({'browser': browser, 'chromium': {'installed': have('chromium')},
                           'tesseract': {'available': tesseract, 'fix': '' if tesseract else FIXES['tesseract']}}))
     return code

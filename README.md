@@ -76,8 +76,10 @@ the fix.
 ### Choosing the preview browser
 
 By default (`auto`) the server uses Playwright's Chromium when it is installed,
-and otherwise Google Chrome. To choose, pass `--browser` to `serve` or
-`doctor`, or set `browser` in `config.toml`. The flag wins over the file.
+and otherwise Google Chrome. To choose, pass `--browser` to `serve`, `doctor`
+or `setup`, or set `browser` in `config.toml`. The flag wins over the file.
+All three also take `--config` to name the config file. `setup` downloads
+Chromium only when the chosen setting finds no browser.
 
 | Value | Meaning |
 | --- | --- |
