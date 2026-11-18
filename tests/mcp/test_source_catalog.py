@@ -111,3 +111,45 @@ def test_overlapping_extractions_keep_other_partial_marker(tmp_path,monkeypatch)
         assert s.store.read_json(w,'source-partial.json')==marker
         release2.set(); wait(s,w,b)
     finally: release1.set(); release2.set(); s.close()
+
+@pytest.mark.parametrize('cancelled',[False,True])
+def test_unpublished_extraction_is_not_retained_evidence(tmp_path,monkeypatch,cancelled):
+    from cards import extract
+    s=Service(tmp_path/'data',[tmp_path]);ready=Event();release=Event();original=extract.extract_source
+    try:
+        w=s.store.create('lecture',text='# First\nOne\n\n# Second\nTwo')['id'];wait(s,w,s.extract_source(w,'1'))
+        def staged(*a,**kw):
+            result=original(*a,**kw);ready.set();assert release.wait(3);return result
+        monkeypatch.setattr(extract,'extract_source',staged)
+        job=s.extract_source(w,'2'); assert ready.wait(2)
+        try:
+            assert s.source_catalog.snapshot(w).candidates(2)==[]
+        finally:
+            if cancelled:s.jobs.cancel(w,job['id'])
+            release.set()
+        if not cancelled:wait(s,w,job);assert s.source_catalog.snapshot(w).candidates(2)
+        else:
+            s.close();assert s.source_catalog.snapshot(w).candidates(2)==[]
+    finally:release.set();s.close()
+
+
+def test_source_read_cannot_remove_new_partial_marker(tmp_path,monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    s=Service(tmp_path/'data',[tmp_path]);read=Event();release=Event();written=Event()
+    try:
+        w=s.store.create('lecture',text='# First\nOne')['id'];partial(s,w,'old')
+        original=s.jobs.get
+        def paused(workspace,job):
+            if job=='old':read.set();assert release.wait(3);return {'status':'completed'}
+            return original(workspace,job)
+        monkeypatch.setattr(s.jobs,'get',paused)
+        def reader():
+            try:s.read_source(w)
+            except DomainError:pass
+        def writer():
+            with s.store.lock(w):partial(s,w,'new');written.set()
+        with ThreadPoolExecutor(2) as pool:
+            a=pool.submit(reader);assert read.wait(1);b=pool.submit(writer)
+            written.wait(.3);release.set();a.result(2);b.result(2)
+        assert s.store.read_json(w,'source-partial.json')['job']=='new'
+    finally:release.set();s.close()

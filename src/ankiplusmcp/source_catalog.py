@@ -89,6 +89,8 @@ class SourceCatalog:
             prefix=str(PurePosixPath(path).parent.parent)
             if prefix in seen or not re.fullmatch(EXTRACTION,prefix): continue
             try:
+                publication=prefix+'/.publication.json'
+                if self.store.path(workspace,publication).exists() and self.store.read_json(workspace,publication).get('status')!='published': continue
                 data=self.store.read_json(workspace,path)
                 if not source or data.get('source_sha256',source['sha256'] if prefix==active else None)!=source['sha256']: continue
                 obj=prefix+'/source/objectives.json'

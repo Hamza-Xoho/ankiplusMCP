@@ -74,3 +74,24 @@ def test_old_index_schema_upgrades(tmp_path):
         db.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, source_hash TEXT, label TEXT, updated TEXT, sequence INTEGER, snapshot TEXT NOT NULL)')
     assert index.search(RunQuery()).runs[0].id==run.id
     with sqlite3.connect(index.path) as db: assert 'journal_token' in {row[1] for row in db.execute('PRAGMA table_info(runs)')}
+
+
+def test_truncated_journal_refuses_search_append_and_rebuild(tmp_path):
+    import pytest
+    from ankiplusmcp.store import DomainError
+    store,run=started(tmp_path);store.append(run.id,RunEvent(kind='coverage_decision',payload={'note_ids':[101]}))
+    index=RunIndex(store);assert index.search(RunQuery(note_id=101)).runs
+    (store.directory/run.id/'00000000000000000002.json').unlink()
+    result=index.search(RunQuery());assert result.runs==[] and result.errors=={run.id:'RUN_CORRUPT'}
+    with pytest.raises(DomainError,match='RUN_CORRUPT'):store.append(run.id,RunEvent(kind='later'))
+    index.path.unlink();assert RunIndex(store).rebuild()==0
+    assert RunIndex(store).search(RunQuery()).errors=={run.id:'RUN_CORRUPT'}
+
+
+def test_legacy_indexed_truncation_is_reported(tmp_path):
+    store,run=started(tmp_path);store.append(run.id,RunEvent(kind='second'))
+    (store.directory/run.id/'.head.json').unlink()
+    index=RunIndex(store);assert index.rebuild()==1
+    (store.directory/run.id/'00000000000000000002.json').unlink()
+    assert index.search(RunQuery()).errors=={run.id:'RUN_CORRUPT'}
+    assert index.search(RunQuery()).errors=={run.id:'RUN_CORRUPT'}

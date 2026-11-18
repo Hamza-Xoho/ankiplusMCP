@@ -76,10 +76,16 @@ class RunStore:
                 if record.sequence != number or file.stem != f'{number:020d}':
                     raise ValueError('noncontiguous event history')
                 records.append(record)
+            head=path/'.head.json'
+            if head.exists() or head.is_symlink():
+                if head.is_symlink(): raise ValueError('journal head is a symbolic link')
+                committed=json.loads(head.read_bytes())['sequence']
+                if type(committed) is not int or committed<1 or committed>len(records):
+                    raise ValueError('acknowledged journal history is missing')
             if not records or records[0].kind != 'run_started':
                 raise ValueError('missing run start')
             return records
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, KeyError, TypeError) as exc:
             raise DomainError('RUN_CORRUPT', 'Run history is invalid; preserve it for recovery.') from exc
 
     def start(self, workspace: str, selection: SourceSelection, config_version: int) -> Run:
@@ -98,6 +104,7 @@ class RunStore:
         staging.mkdir()
         try:
             _publish(staging / f'{1:020d}.json', event.model_dump())
+            _publish(staging / '.head.json', {'sequence':1})
             os.replace(staging, self.directory / ident)
             _sync_directory(self.directory)
         except BaseException:
@@ -160,9 +167,11 @@ class RunStore:
                     prior = previous.model_dump(exclude={'sequence'})
                     if prior != event.model_dump():
                         raise DomainError('CONFLICT', 'Conflicting reuse of an event identifier.')
+                    _publish(path / '.head.json', {'sequence':len(records)})
                     return previous.sequence
             record = EventRecord(**event.model_dump(), sequence=len(records) + 1)
             _publish(path / f'{record.sequence:020d}.json', record.model_dump())
+            _publish(path / '.head.json', {'sequence':record.sequence})
             return record.sequence
 
     def read(self, run_id: str) -> RunSnapshot:
@@ -192,6 +201,10 @@ class RunStore:
                     for file in sorted(path.glob('[0-9]'*20+'.json')):
                         if file.is_symlink(): raise DomainError('RUN_CORRUPT','Event is a symbolic link.')
                         stat=file.stat(); metadata.append((file.name,stat.st_size,stat.st_mtime_ns))
+                    head=path/'.head.json'
+                    if head.exists() or head.is_symlink():
+                        if head.is_symlink(): raise DomainError('RUN_CORRUPT','Journal head is a symbolic link.')
+                        stat=head.stat(); metadata.append((head.name,stat.st_size,stat.st_mtime_ns))
                     token=hashlib.sha256(_encoded({'events':metadata})).hexdigest()
                     if known.get(ident)==token: unchanged.append(ident)
                     else: changed.append(RunProjection(snapshot=self._snapshot(ident,self._records(path)),token=token))

@@ -43,6 +43,7 @@ class RunIndex:
         db.execute('CREATE INDEX IF NOT EXISTS runs_recency ON runs(updated DESC,id)')
         db.execute('CREATE INDEX IF NOT EXISTS lookup_value ON lookups(kind,value,run_id)')
         db.execute('CREATE TABLE IF NOT EXISTS index_errors (id TEXT PRIMARY KEY, code TEXT)')
+        db.execute('CREATE TABLE IF NOT EXISTS journal_watermarks (id TEXT PRIMARY KEY, sequence INTEGER NOT NULL)')
         if 'journal_token' not in {row[1] for row in db.execute('PRAGMA table_info(runs)')}:
             db.execute('ALTER TABLE runs ADD COLUMN journal_token TEXT')
         return db
@@ -53,8 +54,14 @@ class RunIndex:
             db.execute('DELETE FROM lookups')
             db.execute('DELETE FROM runs')
             db.execute('DELETE FROM index_errors')
+            db.execute('DELETE FROM journal_watermarks')
         known=dict(db.execute('SELECT id,journal_token FROM runs'))
+        db.execute('INSERT OR IGNORE INTO journal_watermarks (id,sequence) SELECT id,sequence FROM runs')
+        sequences=dict(db.execute('SELECT id,sequence FROM journal_watermarks'))
         catalog=self.store.catalog(known)
+        truncated={item.snapshot.id for item in catalog.changed if len(item.snapshot.events)<sequences.get(item.snapshot.id,0)}
+        catalog.errors.update({ident:'RUN_CORRUPT' for ident in truncated})
+        catalog.changed=[item for item in catalog.changed if item.snapshot.id not in truncated]
         present=set(catalog.unchanged_ids) | {item.snapshot.id for item in catalog.changed}
         for ident in set(known)-present:
             db.execute('DELETE FROM lookups WHERE run_id=?',(ident,))
@@ -63,6 +70,7 @@ class RunIndex:
         db.executemany('INSERT INTO index_errors (id,code) VALUES (?,?)',sorted(catalog.errors.items()))
         for item in catalog.changed:
             run=item.snapshot
+            db.execute('INSERT OR REPLACE INTO journal_watermarks (id,sequence) VALUES (?,?)',(run.id,len(run.events)))
             db.execute('INSERT OR REPLACE INTO runs (id,source_hash,label,updated,sequence,snapshot,journal_token) VALUES (?,?,?,?,?,?,?)',
                 (run.id,run.selection.source_hash,run.selection.label.casefold(),run.events[-1].timestamp,
                  run.events[-1].sequence,run.model_dump_json(),item.token))

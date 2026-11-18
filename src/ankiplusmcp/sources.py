@@ -14,10 +14,11 @@ class Sources:
         return self.source_catalog.snapshot_locked(workspace).active_prefix
 
     def pending_marker(self, workspace):
-        return self.source_catalog.pending_marker(workspace)
+        with self.store.lock(workspace):
+            return self.source_catalog.pending_marker(workspace)
 
     def source_data(self, workspace):
-        item = self.source_catalog.snapshot_locked(workspace).current()
+        item = self.source_catalog.snapshot(workspace).current()
         return item.prefix, item.data, item.labels_pending
 
     def require_extraction(self, workspace, needs):
@@ -55,6 +56,7 @@ class Sources:
                             if info.get('width',0)*info.get('height',0)>20_000_000:
                                 raise DomainError('LIMIT','Embedded PDF image exceeds 20 million pixels.')
             prefix=f'extractions/{uuid.uuid4().hex}/engine'
+            self.store.write_json(workspace,prefix+'/.publication.json',{'status':'staging'})
             ready=[]
             # The core has already written the early map (figures marked "labels pending") when text_ready runs.
             early=f'text ready; map readable now at {prefix}/source/map.md; '
@@ -82,7 +84,7 @@ class Sources:
                     if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
                     raise
                 data = self.store.read_json(workspace,prefix+'/source/slides.json')
-                self.publisher.publish(ticket,manifest_changes={'source_engine':prefix},cancel=cancel)
+                self.publisher.publish(ticket,json_records={prefix+'/.publication.json':{'status':'published'}},manifest_changes={'source_engine':prefix},cancel=cancel)
             finally: clear_marker()
             return {'_committed':True,'slide_count':data['slide_count'], 'map':prefix+'/source/map.md', 'summary':prefix+'/source/slides_summary.json'}
         return self.jobs.submit(workspace,'extract_source',run)
@@ -113,7 +115,7 @@ class Sources:
         return {'artifact':artifact}
 
     def labels_pending_for(self, workspace, artifact):
-        return self.source_catalog.snapshot_locked(workspace).labels_pending_for(artifact)
+        return self.source_catalog.snapshot(workspace).labels_pending_for(artifact)
 
     def list_figures(self, workspace, offset=0, limit=20):
         prefix, data, pending = self.source_data(workspace)
