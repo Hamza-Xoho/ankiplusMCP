@@ -21,12 +21,35 @@ jobs:
         run: python scripts/check_privacy.py
       - name: Launcher and Python versions agree
         run: python scripts/check_versions.py
+      - name: Frozen contracts and existing host guards
+        run: |
+          sha256sum --check .codex/contract.sha256
+          python .codex/tools/verify_hooks.py
+      - uses: astral-sh/setup-uv@v5
+      - name: Lockfile is current
+        run: uv lock --check
+
+  cli-baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the frozen environment
+        run: uv sync --frozen --extra dev
+      - name: Install the pinned preview browser
+        run: .venv/bin/python -m playwright install --with-deps chromium
+      - name: Compare synthetic CLI artifacts against the reviewed baseline
+        run: .venv/bin/python tests/tools/cli_baseline.py compare tests/fixtures/public/cli-baseline --deterministic
 
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        python: ["3.12", "3.14"]
     runs-on: ${{ matrix.os }}
     env:
       # Contract tests that need private lecture PDFs skip instead of failing
@@ -36,7 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
           cache: pip
       - name: Install Tesseract (Linux)
         if: runner.os == 'Linux'
@@ -94,9 +117,13 @@ jobs:
           npm pack
       - name: End to end through npx, uv and the built wheel
         run: |
-          export ANKIPLUSMCP_PY_SPEC="ankiplusmcp[all] @ file://$PWD/dist/ankiplusmcp-0.3.0-py3-none-any.whl"
+          wheel="$(find "$PWD/dist" -maxdepth 1 -name 'ankiplusmcp-*.whl' -print -quit)"
+          test -n "$wheel"
+          export ANKIPLUSMCP_PY_SPEC="ankiplusmcp[all] @ file://$wheel"
           # A bare path would be run as a command; --package installs the tarball.
-          package="file:$PWD/ankiplusmcp-0.3.0.tgz"
+          tarball="$(find "$PWD" -maxdepth 1 -name 'ankiplusmcp-*.tgz' -print -quit)"
+          test -n "$tarball"
+          package="file:$tarball"
           smoke="$PWD/scripts/smoke-mcp.py"
           work="$(mktemp -d)"
           cd "$work"

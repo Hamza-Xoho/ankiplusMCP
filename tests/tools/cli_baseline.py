@@ -2,6 +2,7 @@
 
     cli_baseline.py record <dir>    write <dir>/cli_baseline.json
     cli_baseline.py compare <dir>   rebuild the snapshot and diff it against that file
+    Add --deterministic to use synthetic OCR instead of system Tesseract.
 
 The tool builds its own inputs in a temporary folder, runs the CLI as a
 subprocess and snapshots stdout, exit codes and every file the CLI writes.
@@ -9,11 +10,13 @@ Run-to-run noise (timestamps, the temporary root, durations) is removed by
 `normalize`, never by changing the CLI.
 """
 import difflib
+import hashlib
 import json
 import os
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -212,7 +215,7 @@ def _snapshot_files(root, builds):
                 files[rel] = normalize(path.name, path.read_text(encoding='utf-8'), root)
             elif path.suffix == '.png':
                 with Image.open(path) as image:
-                    pngs[rel] = f'{image.width}x{image.height}'
+                    pngs[rel] = f'{image.width}x{image.height} sha256:{hashlib.sha256(path.read_bytes()).hexdigest()}'
     return files, pngs
 
 
@@ -245,6 +248,10 @@ def record(directory):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     snapshot = build_snapshot()
+    failed = [c for c in snapshot['commands'] if c['exit_code'] >= 2]
+    if failed:
+        raise RuntimeError('Cannot record failed baseline commands: ' +
+                           ', '.join(' '.join(c['argv'][:2]) for c in failed))
     (directory / SNAPSHOT).write_text(json.dumps(snapshot, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
     print(f"recorded {_count(snapshot)} files, {len(snapshot['commands'])} commands")
     return 0
@@ -276,7 +283,33 @@ def compare(directory):
     return 0
 
 
+@contextmanager
+def deterministic_ocr():
+    """Replace only the external OCR executable; retain extraction and rendering."""
+    previous = os.environ.get('PATH')
+    with tempfile.TemporaryDirectory(prefix='baseline-ocr-') as tmp:
+        shim = Path(tmp) / 'tesseract'
+        fixture = REPO / 'tests/fixtures/public/cli-baseline/tesseract.py'
+        shim.write_text(f'#!{sys.executable}\n' + fixture.read_text(encoding='utf-8'), encoding='utf-8')
+        shim.chmod(0o700)
+        os.environ['PATH'] = tmp + os.pathsep + (previous or '')
+        try:
+            yield
+        finally:
+            if previous is None:
+                os.environ.pop('PATH', None)
+            else:
+                os.environ['PATH'] = previous
+
+
 def main(argv):
+    if '--deterministic' in argv:
+        args = [arg for arg in argv if arg != '--deterministic']
+        if len(args) != 2 or args[0] not in ('record', 'compare'):
+            print(__doc__)
+            return 2
+        with deterministic_ocr():
+            return (record if args[0] == 'record' else compare)(args[1])
     if len(argv) != 2 or argv[0] not in ('record', 'compare'):
         print(__doc__)
         return 2
