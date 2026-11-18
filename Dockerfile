@@ -4,9 +4,9 @@ LABEL org.opencontainers.image.title="ankiplusmcp" org.opencontainers.image.revi
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PLAYWRIGHT_BROWSERS_PATH=/opt/browsers
 WORKDIR /app
 COPY requirements.lock ./
-RUN pip install --no-cache-dir -r requirements.lock \
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 tesseract-ocr \
+    && pip install --no-cache-dir -r requirements.lock \
     && python -m playwright install --with-deps chromium \
-    && apt-get update && apt-get install -y --no-install-recommends tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
