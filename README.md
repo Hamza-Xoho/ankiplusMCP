@@ -254,3 +254,7 @@ Inspect or export run history separately from card review:
 Exports do not overwrite existing files, and legacy import does not modify the original workspace or invent verification. The new run/configuration/guide libraries are building blocks; installing this branch alone does not automatically wrap every existing workflow in a run record or finish onboarding. The guide writer preserves its personal-notes section and refuses to overwrite other user edits.
 
 See [the approved design](docs/superpowers/specs/2026-11-18-student-workflows-design.md), [implementation plan](docs/superpowers/plans/2026-11-18-student-workflows.md) and [verification checkpoint](docs/refactor/implementation-checkpoint.md). To use this checkout through the launcher, set `ANKIPLUSMCP_PY_SPEC` as documented above; the released version tag does not contain unpushed branch changes.
+
+### Pre-macOS refactor investigation
+
+The source catalog, artifact publisher, authoritative run discovery and shared coverage batches are internal refactors; they do not establish Desktop or release compatibility. Run the disposable synthetic rehearsal with `.venv/bin/python scripts/smoke-premacos.py --output .artifacts/premacos/smoke.json` (fresh output only). It uses real extraction, OCR and Chromium with zero Anki operations. See [local evidence](docs/refactor/premacos-readiness.md) and the [ordered Mac test packet](docs/refactor/macos-test-packet.md). Independent host reviewers, companion integration, onboarding and private-quality acceptance remain outstanding.

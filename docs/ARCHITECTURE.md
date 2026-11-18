@@ -354,3 +354,13 @@ tests.
 - **Receipt**: what Anki returned for a write batch.
 - **Reconcile**: the search for existing notes on the same facts, so the tool
   proposes an unsuspend instead of a duplicate.
+
+## Independent MCP internals (pre-macOS refactor, 2026-11-18)
+
+Legacy CLI architecture above applies to `cards`; the independent MCP composes `Store`, `Jobs`, `SourceCatalog` and `ArtifactPublisher` in `Service`. Catalog snapshots own active/retained/partial extraction selection, source hash validation, available pages and printed labels. Evidence matching remains whitespace-tolerant exact extracted text, bounded to 20 references/24,000 quotation characters, with OCR and unverified-source labels preserved.
+
+Callers holding the workspace lock use `snapshot_locked`/`capture_locked`; ordinary snapshots acquire one workspace lock. Native OCR/extraction/rendering runs outside that lock. Publication revalidates captured source/input fingerprints and optional semantic revision under a short lock, then publishes replacements, JSON pointers and one artifact epoch. Multiple renames are not a filesystem transaction; abandoned unique outputs remain recoverable. Semantic revisions describe card edits, not reproducible artifacts. Partial labels are unknown (`None`) until completion; current published extraction takes precedence. Partial-marker compare/removal shares the workspace lock.
+
+Run files are authoritative; SQLite is disposable. `RunStore.catalog` owns directory/layout/locking and freshness tokens derived from event filename, size and mtime metadata. Tokens avoid reparsing unchanged history and make no integrity-verification claim. The index consumes changed snapshots/unchanged IDs/per-run errors, removing damaged stale projections while retaining files. Run locks are independent of workspace locks; catalog reads do not acquire a workspace lock.
+
+Coverage batches share one supplied collection observation, actual configuration version and normalized decisions/evidence per event. Explicit batch retries compare a canonical request digest before reading new preferences; concurrent winners are reread. Old individual events and new batches replay in sequence. Caller observations remain unverified; no Anki transport or collection action is implemented here.

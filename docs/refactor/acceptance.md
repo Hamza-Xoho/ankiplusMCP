@@ -20,3 +20,7 @@ First release includes the complete approved product scope and verified required
 ## Current scope boundaries
 
 Public publishing, merges, live collection mutation and exposing a local Anki endpoint are not authorized by implementation approval. Windows and alternative hosts are not supported merely because adapter/configuration unit tests pass. PDFCraft is optional; its integration cannot replace the agreed review UI without an explicit decision.
+
+## Final pre-macOS pass
+
+Local synthetic tests and the rehearsal prepare the Mac investigation only. See `premacos-readiness.md` for exact revision/commands and `macos-test-packet.md` for host experiments. Desktop compatibility, independent reviewer execution under Desktop/Pro, companion write recovery, onboarding integration and private-quality acceptance remain unverified. The existing 24 private-fixture cases remain unresolved; public-CI skips do not waive them. Original product/audit tasks remain governed by the audit disposition and approved plan.

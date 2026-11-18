@@ -82,3 +82,7 @@ Additional execution rulings:
 11. Apply explicitly saved preferences to later decisions in the same run, recording the actual configuration version per event. Cost: later authorization must bind relevant current preferences rather than only the initial run version.
 12. Retain source-hash-matching extraction identity/history for chapter citations. Cost: derived-artifact cleanup must respect historical citation dependencies.
 13. Require usable selected card IDs before declaring active coverage. Cost: incomplete caller snapshots stay pending instead of being treated as successful matches.
+
+## Final pre-macOS architecture pass
+
+The approved six-task supplement centralizes source discovery and native publication, hides run layout from indexing and adopts shared coverage batches after synthetic measurement met its 25% duplication gate. Historical event readers remain; no old history was rewritten. See `premacos-readiness.md` for revision-specific verification and `macos-test-packet.md` for the unpassed real-host gate. Earlier checkpoint evidence above is retained. Full product integration and private acceptance are still outstanding.
