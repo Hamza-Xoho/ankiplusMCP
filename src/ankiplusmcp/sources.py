@@ -105,22 +105,15 @@ class Sources:
 
     def get_page_image(self, workspace, page):
         from cards.source import page_image
-        pending = {}
-        try:
-            with self.store.artifact_work(workspace, publish=lambda: os.replace(pending['temporary'], pending['target'])) as state:
-                # Stage expensive output; a rejected publication must preserve the previous page.
-                candidates=self.source_catalog.snapshot(workspace).candidates(page)
-                if not candidates:
-                    raise DomainError('SOURCE_REF','Page is absent from the retained source extractions.')
-                prefix, _, _ = candidates[0]
-                artifact=f'{prefix}/source/pages/p{page:02d}.png'
-                pending['target']=self.store.path(workspace,artifact)
-                pending['temporary']=pending['target'].with_name(f'.p{page:02d}-{uuid.uuid4().hex}.png')
-                page_image(Path(state['source']['path']),pending['temporary'],page)
-            return {'artifact':artifact}
-        finally:
-            if pending.get('temporary'):
-                pending['temporary'].unlink(missing_ok=True)
+        with self.store.lock(workspace):
+            ticket=self.publisher.capture_locked(workspace)
+            candidates=self.source_catalog.snapshot_locked(workspace).candidates(page)
+            if not candidates: raise DomainError('SOURCE_REF','Page is absent from the retained source extractions.')
+            artifact=f'{candidates[0][0]}/source/pages/p{page:02d}.png'
+        with self.publisher.temporary(workspace,artifact) as temporary:
+            page_image(Path(ticket.manifest['source']['path']),self.store.path(workspace,temporary),page)
+            self.publisher.publish(ticket,replacements={temporary:artifact})
+        return {'artifact':artifact}
 
     def labels_pending_for(self, workspace, artifact):
         return self.source_catalog.snapshot_locked(workspace).labels_pending_for(artifact)

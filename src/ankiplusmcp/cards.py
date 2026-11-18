@@ -129,7 +129,8 @@ class Cards:
             if not selected: raise DomainError('CARD','No cards to render.','Save cards first.')
             revision=self.store.get(workspace)['revision']
             cards_hash=digest(self.store.path(workspace,'cards.json'))
-            media_hashes={m['path']:digest(self.store.path(workspace,m['path'])) for c in selected for m in c['media']}
+            ticket=self.publisher.capture_locked(workspace, expected_revision=revision, bind_source=False,
+                inputs={'cards.json':'STALE', **{m['path']:'MEDIA_CHANGED' for c in selected for m in c['media']}})
         def run(cancel, report):
             from cards import render
             from cards.render.templates import CLOZE, fill, page
@@ -174,10 +175,6 @@ class Cards:
             variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,browser)
             if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
             result={'_committed':True,'samples':variants,'sheets':sheets,'cards_sha256':cards_hash,'selected_ids':[c['id'] for c in selected],'card_revision':revision,'prefix':prefix,'approximation': 'Local inert template rendering; custom Anki filters/add-on JavaScript are not executed.'}
-            with self.store.edit(workspace,revision,artifact=True):
-                if cancel(): raise DomainError('CANCELLED','Cancelled before preview publication.')
-                if any(digest(self.store.path(workspace,path)) != sha for path,sha in media_hashes.items()):
-                    raise DomainError('MEDIA_CHANGED','Card media changed while rendering.')
-                self.store.write_json(workspace,'latest-preview.json',result)
+            self.publisher.publish(ticket,json_records={'latest-preview.json':result},cancel=cancel)
             return result
         return self.jobs.submit(workspace,'render_cards',run)

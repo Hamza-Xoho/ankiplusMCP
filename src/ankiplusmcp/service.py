@@ -1,4 +1,5 @@
 """Composition root; no model calls and no Anki client."""
+from .publication import ArtifactPublisher
 from .source_catalog import SourceCatalog
 from .store import Store
 from .jobs import Jobs
@@ -17,6 +18,7 @@ class Service(Sources, Artifacts, Cards, Review, Payloads):
         self.browser = browser
         self.jobs = Jobs(self.store)
         self.source_catalog = SourceCatalog(self.store, self.jobs)
+        self.publisher = ArtifactPublisher(self.store)
 
     def close(self):
         self.jobs.close()
