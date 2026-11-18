@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 import uuid
-from filelock import FileLock
+from filelock import FileLock, Timeout
 from cards.common.files import atomic_write
 
 MAX_FILE = 64 * 1024 * 1024
@@ -79,20 +79,51 @@ class Store:
             raise DomainError('ARTIFACT', f'Cannot read {relative}.', 'List artifacts and use an existing JSON artifact.') from exc
 
     @contextmanager
-    def lock(self, ident, name='workspace'):
+    def lock(self, ident, name='workspace', *, timeout=5):
         # A new FileLock per call: two threads in one process must still exclude each other.
-        with FileLock(self.path(ident, f'.{name}.lock')):
-            yield
+        try:
+            with FileLock(self.path(ident, f'.{name}.lock'), timeout=timeout):
+                yield
+        except Timeout as exc:
+            raise DomainError('BUSY', 'Workspace is busy.', 'Retry after the active operation releases its lock.') from exc
 
     @contextmanager
-    def edit(self, ident, expected_revision=None):
+    def edit(self, ident, expected_revision=None, *, artifact=False):
         with self.lock(ident):
             manifest = self.get(ident)
             if expected_revision is not None and manifest['revision'] != expected_revision:
                 raise DomainError('STALE', f'Expected revision {expected_revision}; current revision is {manifest["revision"]}.', 'Read get_workspace and rebase the change.')
             yield manifest
-            manifest['revision'] += 1
+            key = 'artifact_revision' if artifact else 'revision'
+            manifest[key] = manifest.get(key, 0) + 1
             self.write_json(ident, 'workspace.json', manifest)
+
+    @contextmanager
+    def artifact_work(self, ident, *, inputs=(), source=None, cancel=None, publish=None):
+        """Snapshot inputs, release the lock for native work, validate on publication."""
+        with self.lock(ident):
+            state = self.get(ident)
+            original_source = state.get('source')
+            if source is not None and source != original_source:
+                raise DomainError('SOURCE_CHANGED', 'Source changed before artifact work started.')
+            fingerprints = {name: digest(self.path(ident, name)) for name in inputs}
+        if cancel and cancel():
+            raise DomainError('CANCELLED', 'Cancelled before artifact work.')
+        yield state
+        with self.lock(ident):
+            current = self.get(ident)
+            if cancel and cancel():
+                raise DomainError('CANCELLED', 'Cancelled before artifact publication.')
+            if current.get('source') != original_source:
+                raise DomainError('SOURCE_CHANGED', 'Source changed during artifact work.')
+            if original_source and digest(Path(original_source['path'])) != original_source['sha256']:
+                raise DomainError('SOURCE_CHANGED', 'Source snapshot changed during artifact work.')
+            if any(digest(self.path(ident, name)) != sha for name, sha in fingerprints.items()):
+                raise DomainError('ARTIFACT_CHANGED', 'Artifact input changed during native work.')
+            if publish is not None:
+                publish()
+            current['artifact_revision'] = current.get('artifact_revision', 0) + 1
+            self.write_json(ident, 'workspace.json', current)
 
     def get(self, ident):
         return self.read_json(ident, 'workspace.json')

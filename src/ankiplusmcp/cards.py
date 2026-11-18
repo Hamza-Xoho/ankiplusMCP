@@ -81,51 +81,56 @@ class Cards:
             selected=self._select(workspace,ids)
             if not selected: raise DomainError('CARD','No cards to render.','Save cards first.')
             revision=self.store.get(workspace)['revision']
+            cards_hash=digest(self.store.path(workspace,'cards.json'))
+            media_hashes={m['path']:digest(self.store.path(workspace,m['path'])) for c in selected for m in c['media']}
         def run(cancel, report):
             from cards import render
             from cards.render.templates import CLOZE, fill, page
             from cards.render.occlusion import bodies
             from cards.common.paths import Build
-            with self.store.edit(workspace,revision) as state:
-                if cancel(): raise DomainError('CANCELLED','Cancelled.')
-                rows=[]
-                for card in selected:
-                    media={m['filename']:str(self.store.path(workspace,m['path'])) for m in card['media']}
-                    b=Build(self.store.directory(workspace))
-                    if card['question'] is not None:
-                        pairs=[(card['id'],card['question'],card['answer'])]
-                    elif card['kind']=='io':
-                        fronts,answer=bodies(b,card['fields'],media)
-                        pairs=[(f'{card["id"]}_c{n}',q,answer) for n,q in fronts]
+            if cancel(): raise DomainError('CANCELLED','Cancelled.')
+            rows=[]
+            for card in selected:
+                media={m['filename']:str(self.store.path(workspace,m['path'])) for m in card['media']}
+                b=Build(self.store.directory(workspace))
+                if card['question'] is not None:
+                    pairs=[(card['id'],card['question'],card['answer'])]
+                elif card['kind']=='io':
+                    fronts,answer=bodies(b,card['fields'],media)
+                    pairs=[(f'{card["id"]}_c{n}',q,answer) for n,q in fronts]
+                else:
+                    fields=card['fields']; names=list(fields)
+                    primary=names[0]
+                    if card['kind']=='cloze':
+                        numbers=sorted({int(m[1]) for value in fields.values() for m in CLOZE.finditer(value)})
+                        if not numbers: raise DomainError('CLOZE','No valid cloze to render.')
+                        ft=front or '{{cloze:'+primary+'}}'
+                        bt=back or ft+'<hr>'+('{{'+names[1]+'}}' if len(names)>1 else '')
                     else:
-                        fields=card['fields']; names=list(fields)
-                        primary=names[0]
-                        if card['kind']=='cloze':
-                            numbers=sorted({int(m[1]) for value in fields.values() for m in CLOZE.finditer(value)})
-                            if not numbers: raise DomainError('CLOZE','No valid cloze to render.')
-                            ft=front or '{{cloze:'+primary+'}}'
-                            bt=back or ft+'<hr>'+('{{'+names[1]+'}}' if len(names)>1 else '')
-                        else:
-                            numbers=[1]; ft=front or '{{'+primary+'}}'; bt=back or '{{FrontSide}}<hr>'+('{{'+names[1]+'}}' if len(names)>1 else '')
-                        pairs=[]
-                        for n in numbers:
-                            question=fill(ft,fields,card['tags'],n,'front')
-                            answer=fill(bt,fields,card['tags'],n,'back',question)
-                            pairs.append((f'{card["id"]}_c{n}',question,answer))
-                    for ident,question,answer in pairs:
-                        # Inline only validated workspace media before handing inert HTML to renderer.
-                        cleaner=lambda content: page('',content,b,media).split("<div id='qa'>",1)[1].rsplit('</div></body>',1)[0]
-                        rows.append({'id':ident,'question':cleaner(question),'answer':cleaner(answer)})
-                prefix=f'previews/{uuid.uuid4().hex}'
-                build=self.store.path(workspace,prefix); build.mkdir(parents=True)
-                self.store.write_json(workspace,prefix+'/input.json',rows)
-                sheets_abs=render.render_rows(rows,build,css=css,per_sheet=per_sheet,browser=browser)
-                if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
-                sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in sheets_abs]
-                from .variants import samples
-                variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,browser)
-                if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
-                result={'_committed':True,'samples':variants,'sheets':sheets,'cards_sha256':digest(self.store.path(workspace,'cards.json')),'selected_ids':[c['id'] for c in selected],'card_revision':revision,'prefix':prefix,'approximation': 'Local inert template rendering; custom Anki filters/add-on JavaScript are not executed.'}
+                        numbers=[1]; ft=front or '{{'+primary+'}}'; bt=back or '{{FrontSide}}<hr>'+('{{'+names[1]+'}}' if len(names)>1 else '')
+                    pairs=[]
+                    for n in numbers:
+                        question=fill(ft,fields,card['tags'],n,'front')
+                        answer=fill(bt,fields,card['tags'],n,'back',question)
+                        pairs.append((f'{card["id"]}_c{n}',question,answer))
+                for ident,question,answer in pairs:
+                    # Inline only validated workspace media before handing inert HTML to renderer.
+                    cleaner=lambda content: page('',content,b,media).split("<div id='qa'>",1)[1].rsplit('</div></body>',1)[0]
+                    rows.append({'id':ident,'question':cleaner(question),'answer':cleaner(answer)})
+            prefix=f'previews/{uuid.uuid4().hex}'
+            build=self.store.path(workspace,prefix); build.mkdir(parents=True)
+            self.store.write_json(workspace,prefix+'/input.json',rows)
+            sheets_abs=render.render_rows(rows,build,css=css,per_sheet=per_sheet,browser=browser)
+            if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
+            sheets=[dict(sheet,**{side:str(Path(sheet[side]).relative_to(self.store.directory(workspace))) for side in ('fronts','backs')}) for sheet in sheets_abs]
+            from .variants import samples
+            variants=samples(self.store,workspace,prefix,rows,css,desktop_sample,light,cancel,browser)
+            if cancel(): raise DomainError('CANCELLED','Cancelled; previews not marked current.')
+            result={'_committed':True,'samples':variants,'sheets':sheets,'cards_sha256':cards_hash,'selected_ids':[c['id'] for c in selected],'card_revision':revision,'prefix':prefix,'approximation': 'Local inert template rendering; custom Anki filters/add-on JavaScript are not executed.'}
+            with self.store.edit(workspace,revision,artifact=True):
+                if cancel(): raise DomainError('CANCELLED','Cancelled before preview publication.')
+                if any(digest(self.store.path(workspace,path)) != sha for path,sha in media_hashes.items()):
+                    raise DomainError('MEDIA_CHANGED','Card media changed while rendering.')
                 self.store.write_json(workspace,'latest-preview.json',result)
-                return result
+            return result
         return self.jobs.submit(workspace,'render_cards',run)

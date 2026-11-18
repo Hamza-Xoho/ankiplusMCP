@@ -65,11 +65,11 @@ def test_conflicting_media_and_updates_are_refused(tmp_path):
         path=tmp_path/(color+'.png'); Image.new('RGB',(10,10),color).save(path)
         media.append(s.import_image(w,str(path))['artifact'])
     cards=[{'id':str(i),'kind':'basic','fields':{'Front':'<img src="same.png">','Back':str(i)},'media':[{'path':m,'filename':'same.png'}]} for i,m in enumerate(media)]
-    s.save_cards(w,cards,2)
-    with pytest.raises(DomainError,match='media'): s.prepare_write(w,3)
+    s.save_cards(w,cards,0)
+    with pytest.raises(DomainError,match='media'): s.prepare_write(w,1)
     cards=[{'id':str(i),'kind':'basic','action':'update','note_id':123,'fields':{'Front':str(i)}} for i in range(2)]
-    s.save_cards(w,cards,3)
-    with pytest.raises(DomainError,match='update'): s.prepare_write(w,4)
+    s.save_cards(w,cards,1)
+    with pytest.raises(DomainError,match='update'): s.prepare_write(w,2)
     s.close()
 
 
@@ -100,12 +100,12 @@ def test_identical_media_dedup_and_compatible_note_updates(tmp_path):
     one=s.import_image(w,str(image))['artifact']; two=s.import_image(w,str(image))['artifact']
     cards=[{'id':'a','kind':'basic','action':'update','note_id':123,'fields':{'Front':'one'},'media':[{'path':one,'filename':'same.png'}]},
            {'id':'b','kind':'basic','action':'update','note_id':123,'fields':{'Back':'two'},'media':[{'path':two,'filename':'same.png'}]}]
-    s.save_cards(w,cards,2)
-    plan=s.prepare_write(w,3); data=s.store.read_json(w,plan['artifact'])
+    s.save_cards(w,cards,0)
+    plan=s.prepare_write(w,1); data=s.store.read_json(w,plan['artifact'])
     assert data['updates']==[{'note_id':123,'fields':{'Front':'one','Back':'two'}}]
     assert len(data['media'])==1
     occlusion=s.build_occlusion(w,one,[{'left':.1,'top':.1,'width':.2,'height':.2,'text':'name'}])
-    s.save_cards(w,[{'id':'io','kind':'io','fields':occlusion['fields'],'media':occlusion['media']}],4)
+    s.save_cards(w,[{'id':'io','kind':'io','fields':occlusion['fields'],'media':occlusion['media']}],1)
     assert not s.check_cards(w)['blockers']
-    assert s.prepare_write(w,5)['created']==1
+    assert s.prepare_write(w,2)['created']==1
     s.close()

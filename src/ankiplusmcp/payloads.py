@@ -1,8 +1,11 @@
 """Prepare Anki arguments and record caller evidence; never contact Anki."""
 from collections import defaultdict
+import json
 import uuid
 from .models import ExternalResult
 from .store import DomainError, digest
+from .runs import _publish
+from .run_models import utc_now
 
 class Payloads:
     def prepare_write(self, workspace, expected_revision, ids=None):
@@ -62,7 +65,23 @@ class Payloads:
         with self.store.edit(workspace,expected_revision) as state:
             plan=self.store.read_json(workspace,f'write/{plan_id}/plan.json')
             if plan['cards_sha256']!=digest(self.store.path(workspace,'cards.json')): raise DomainError('STALE','Write plan is stale.','Reconcile actual Anki results before preparing another plan.')
-            self.store.write_json(workspace,f'write/{plan_id}/external-results.json',{'results':parsed,'evidence_origin':'caller_supplied','independently_verified':False})
+            relative=f'write/{plan_id}/external-results.json'
+            receipt_path=self.store.path(workspace,relative)
+            previous=self.store.read_json(workspace,relative).get('results',[]) if receipt_path.is_file() else []
+            journal=self.store.path(workspace,f'write/{plan_id}/result-events')
+            journal.mkdir(exist_ok=True)
+            # Publish recording intent before updating the compatibility projection.
+            # Replaying journals recovers a crash between these two publications.
+            number=max((int(path.stem) for path in journal.glob('[0-9]'*20+'.json')),default=0)+1
+            _publish(journal/(f'{number:020d}.json'),{'sequence':number,'timestamp':utc_now(),'results':parsed,'evidence_origin':'caller_supplied','independently_verified':False})
+            combined=[]; seen=set()
+            groups=[previous]+[self.store.read_json(workspace,str(path.relative_to(self.store.directory(workspace))))['results'] for path in sorted(journal.glob('*.json'))]
+            for group in groups:
+                for result in group:
+                    key=json.dumps(result,sort_keys=True,ensure_ascii=False,allow_nan=False)
+                    if key not in seen:
+                        seen.add(key); combined.append(result)
+            _publish(receipt_path,{'results':combined,'evidence_origin':'caller_supplied','independently_verified':False})
         return {'revision':state['revision'],'recorded':len(parsed),'evidence_origin':'caller_supplied','independently_verified':False}
 
     def get_report(self, workspace):

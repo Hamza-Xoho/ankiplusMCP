@@ -1,5 +1,6 @@
 """Independent source and figure operations adapting the deterministic toolkit."""
 import html
+import os
 from pathlib import Path
 from types import SimpleNamespace
 import uuid
@@ -104,7 +105,7 @@ class Sources:
                     if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
                     raise
                 # 3. Publish: the source must be the one we read.
-                with self.store.edit(workspace) as state:
+                with self.store.edit(workspace, artifact=True) as state:
                     if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
                     # Compare with the hash phase 1 checked: that is the file the extractor read.
                     if digest(Path(state['source']['path'])) != sha: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
@@ -129,12 +130,20 @@ class Sources:
 
     def get_page_image(self, workspace, page):
         from cards.source import page_image
-        with self.store.edit(workspace) as state:
-            # Pages depend only on the PDF, so the early text's folder serves while labels are pending.
-            prefix, data, _ = self.source_data(workspace)
-            selection(str(page),[s['n'] for s in data['slides']])
-            page_image(Path(state['source']['path']),self.store.path(workspace,f'{prefix}/source/pages/p{page:02d}.png'),page)
-        return {'artifact':f'{prefix}/source/pages/p{page:02d}.png'}
+        pending = {}
+        try:
+            with self.store.artifact_work(workspace, publish=lambda: os.replace(pending['temporary'], pending['target'])) as state:
+                # Stage expensive output; a rejected publication must preserve the previous page.
+                prefix, data, _ = self.source_data(workspace)
+                selection(str(page),[s['n'] for s in data['slides']])
+                artifact=f'{prefix}/source/pages/p{page:02d}.png'
+                pending['target']=self.store.path(workspace,artifact)
+                pending['temporary']=pending['target'].with_name(f'.p{page:02d}-{uuid.uuid4().hex}.png')
+                page_image(Path(state['source']['path']),pending['temporary'],page)
+            return {'artifact':artifact}
+        finally:
+            if pending.get('temporary'):
+                pending['temporary'].unlink(missing_ok=True)
 
     def labels_pending_for(self, workspace, artifact):
         """True when `artifact` lies in an extraction whose figure labels are still being read."""
@@ -154,7 +163,7 @@ class Sources:
         raise DomainError('FIGURE','Unknown figure ID.','Use list_figures.')
 
     def import_image(self, workspace, path):
-        with self.store.edit(workspace): artifact = self.store.import_file(workspace,path)
+        with self.store.edit(workspace, artifact=True): artifact = self.store.import_file(workspace,path)
         return {'artifact':artifact}
 
     def ocr_image(self, workspace, artifact, min_conf=20, min_len=2, group=True, pad=.004):
@@ -162,7 +171,7 @@ class Sources:
         self.image_bytes(workspace,artifact)  # verify image and size before OCR
         def run(cancel, report):
             from cards.extract.ocr import extract
-            with self.store.edit(workspace):
+            with self.store.artifact_work(workspace, inputs=[artifact], cancel=cancel):
                 if cancel(): raise DomainError('CANCELLED','Cancelled.')
                 result = extract(self.store.path(workspace,artifact),min_conf=min_conf,min_len=min_len,group=group,pad=pad)
                 name = f'ocr/{uuid.uuid4().hex}.json'; self.store.write_json(workspace,name,result)
@@ -176,7 +185,7 @@ class Sources:
         self.image_bytes(workspace,artifact)
         parsed = parse_regions(regions,','.join(map(str,keep)) if keep is not None else None)
         if not parsed: raise DomainError('REGIONS','Supply at least one region.')
-        with self.store.edit(workspace):
+        with self.store.artifact_work(workspace, inputs=[artifact]):
             ident = uuid.uuid4().hex
             media, preview = f'media/{ident}.png',f'media/{ident}_preview.png'
             self.store.path(workspace,media).parent.mkdir(exist_ok=True)
@@ -203,7 +212,7 @@ class Sources:
         if not source or Path(source['path']).suffix!='.pdf': raise DomainError('SOURCE','Figure export requires a PDF.')
         def run(cancel, report):
             import pymupdf
-            with self.store.edit(workspace):
+            with self.store.artifact_work(workspace, source=source, cancel=cancel):
                 prefix=f'exports/{uuid.uuid4().hex}'; figures=[]
                 with pymupdf.open(source['path']) as doc:
                     if len(doc)>500: raise DomainError('LIMIT','PDF exceeds 500 pages.')
@@ -229,7 +238,7 @@ class Sources:
         for sub in source.with_suffix('').glob('subagents/agent-*.jsonl'):
             self.store.source(str(sub))
             self.store.source(str(sub.with_suffix('.meta.json')))
-        with self.store.edit(workspace):
+        with self.store.artifact_work(workspace):
             prefix=f'usage/{uuid.uuid4().hex}'
             result=meter.run(SimpleNamespace(build=None,session=str(source),latest=None,out=str(self.store.path(workspace,prefix)),line=False))
         return {'format':'claude_code','summary':result.lines,'json':prefix+'/cost.json','markdown':prefix+'/cost.md'}

@@ -37,7 +37,7 @@ def test_existing_custom_fields_render(tmp_path):
     assert not s.check_cards(w)['blockers']
     output = wait(s,w,s.render_cards(w))
     assert s.image_bytes(w,output['sheets'][0]['fronts']).startswith(b'\x89PNG')
-    plan = s.prepare_write(w,2)
+    plan = s.prepare_write(w,1)
     assert plan['updated'] == 1
     assert s.store.read_json(w,plan['artifact'])['updates'][0]['note_id'] == 123
     s.close()
@@ -72,9 +72,9 @@ def test_visual_review_uses_card_hash_not_unrelated_revision(tmp_path):
     s=Service(tmp_path/'work',[tmp_path]); w=s.store.create('cards')['id']
     s.save_cards(w,[card()],0)
     wait(s,w,s.render_cards(w))
-    s.submit_review(w,'reviewer',[{'card_id':'n1','verdict':'pass'}],2)
+    s.submit_review(w,'reviewer',[{'card_id':'n1','verdict':'pass'}],1)
     assert 'sheets' in s.prepare_review(w,scope='visual')
-    s.save_cards(w,[card(fields={'Text':'{{c1::New}} content'})],3)
+    s.save_cards(w,[card(fields={'Text':'{{c1::New}} content'})],2)
     assert s.prepare_review(w,scope='visual')['status']=='stale_previews'
     s.close()
 
