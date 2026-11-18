@@ -153,3 +153,17 @@ test('hermes is a manual step with a YAML snippet', () => {
   assert.equal(r.status, 3);
   assert.match(JSON.parse(r.stdout).manual, /mcp_servers:\n  ankiplusmcp:\n    command: "npx"/);
 });
+
+
+test('Windows Desktop registration uses APPDATA and keeps detection consistent', () => {
+  const home = tempDir();
+  const appdata = join(tempDir(), 'Roaming');
+  mkdirSync(join(appdata, 'Claude'), { recursive: true });
+  const options = { scope: 'user', entry: { command: 'npx', args: [] }, homedir: home,
+    platform: 'win32', env: { APPDATA: appdata }, cwd: '/c' };
+  const plan = HOSTS['claude-desktop'].plan(options);
+  assert.equal(plan.file, join(appdata, 'Claude', 'claude_desktop_config.json'));
+  assert.equal(HOSTS['claude-desktop'].detect(options), true);
+  const fallback = HOSTS['claude-desktop'].plan({ ...options, env: {} });
+  assert.equal(fallback.file, join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'));
+});

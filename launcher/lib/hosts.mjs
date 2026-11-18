@@ -42,9 +42,9 @@ export const HOSTS = {
   'claude-desktop': {
     label: 'Claude Desktop',
     scopes: ['user'],
-    detect: ({ homedir, platform }) => existsSync(join(homedir, ...desktopDir(platform))),
-    plan: ({ entry, homedir, platform }) => ({
-      kind: 'json', file: join(homedir, ...desktopDir(platform), 'claude_desktop_config.json'), keyPath: ['mcpServers', SERVER], value: { ...entry },
+    detect: (options) => existsSync(desktopDir(options)),
+    plan: (options) => ({
+      kind: 'json', file: join(desktopDir(options), 'claude_desktop_config.json'), keyPath: ['mcpServers', SERVER], value: { ...options.entry },
     }),
     skillDir: () => null,
   },
@@ -89,6 +89,8 @@ export const HOSTS = {
   },
 };
 
-function desktopDir(platform) {
-  return platform === 'darwin' ? ['Library', 'Application Support', 'Claude'] : ['.config', 'Claude'];
+function desktopDir({ platform, homedir, env = {} }) {
+  if (platform === 'darwin') return join(homedir, 'Library', 'Application Support', 'Claude');
+  if (platform === 'win32') return join(env.APPDATA || join(homedir, 'AppData', 'Roaming'), 'Claude');
+  return join(homedir, '.config', 'Claude');
 }
