@@ -86,3 +86,5 @@ Additional execution rulings:
 ## Final pre-macOS architecture pass
 
 The approved six-task supplement centralizes source discovery and native publication, hides run layout from indexing and adopts shared coverage batches after synthetic measurement met its 25% duplication gate. Historical event readers remain; no old history was rewritten. See `premacos-readiness.md` for revision-specific verification and `macos-test-packet.md` for the unpassed real-host gate. Earlier checkpoint evidence above is retained. Full product integration and private acceptance are still outstanding.
+
+Final source `290b246` passed 615 public-CI tests with the existing 25 skips, 382 check-mcp tests/one system-Chrome skip, all frozen hashes/42 hooks, unchanged 66-file/14-command golden, five synthetic rehearsal scenarios and source/evidence/history recovery regressions. Launcher remains 29/29. The single fresh review produced three material findings, all fixed with RED→GREEN tests. Exact logs and container outcome are in `premacos-readiness.md`; the real Mac/private acceptance gates are still open.

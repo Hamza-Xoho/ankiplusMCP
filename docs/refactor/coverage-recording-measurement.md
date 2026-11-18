@@ -17,3 +17,5 @@ Gate passed: 79.05% with 20 notes; 97.98% with 500 notes. Batching adopted; old 
 | 100 | 500 | 4889190/100/101 | 70853/1/2 | 5.1293/0.0699 |
 
 Every after case has one shared snapshot and one decision event. Reconstructed decisions were asserted identical. Full case sizes, byte fractions, search timings/read counts, platform, Python and source revision are in ignored `.artifacts/premacos/coverage-{before,after}.json`. These measurements establish synthetic duplication, not real workload frequency.
+
+The post-review rehearsal repeated all nine measurements at clean source `290b246`; `.artifacts/premacos/coverage-final.json` retains these results. Journal-byte measurements count authoritative event files; the later small acknowledged-head metadata file is excluded. This does not affect the adoption gate measured before that addition.
