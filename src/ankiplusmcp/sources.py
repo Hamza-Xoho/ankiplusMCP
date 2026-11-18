@@ -134,8 +134,11 @@ class Sources:
         try:
             with self.store.artifact_work(workspace, publish=lambda: os.replace(pending['temporary'], pending['target'])) as state:
                 # Stage expensive output; a rejected publication must preserve the previous page.
-                prefix, data, _ = self.source_data(workspace)
-                selection(str(page),[s['n'] for s in data['slides']])
+                from .evidence import EvidenceResolver
+                candidates=EvidenceResolver(self).page_candidates(workspace,state['source'],page)
+                if not candidates:
+                    raise DomainError('SOURCE_REF','Page is absent from the retained source extractions.')
+                prefix, _, _ = candidates[0]
                 artifact=f'{prefix}/source/pages/p{page:02d}.png'
                 pending['target']=self.store.path(workspace,artifact)
                 pending['temporary']=pending['target'].with_name(f'.p{page:02d}-{uuid.uuid4().hex}.png')

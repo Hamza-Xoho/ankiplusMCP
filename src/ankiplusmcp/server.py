@@ -12,7 +12,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ImageContent, ToolAnnotations
 from pydantic import Field, ValidationError
 from cards.common.errors import CardsError
-from .models import Card, Region, Finding, ExternalResult
+from .models import Card, CardPatch, Region, Finding, ExternalResult
+from .evidence import EvidenceRef, EvidenceResolver
 from .store import DomainError
 from .service import Service
 from . import settings, doctor
@@ -80,6 +81,11 @@ class API:
         """Search extracted text case-insensitively; return matching lines and slide numbers."""
         return self.s.search_source(workspace,query,offset,limit)
 
+    def get_source_evidence(self, workspace: Workspace, refs: Annotated[list[EvidenceRef],Field(min_length=1,max_length=20)]) -> dict:
+        """Resolve source-hash/page citations to exact stored quotations, with OCR and physical-page labels. Text sections are not PDF pages."""
+        return {'evidence':[item.model_dump() for item in EvidenceResolver(self.s).resolve(workspace,refs)],
+                'source_accuracy_verified':False}
+
     def get_page_image(self, workspace: Workspace, page: Annotated[int,Field(ge=1,le=500)]) -> dict:
         """Rasterize one source PDF page as an artifact. Fetch it with get_image to inspect it."""
         return self.s.get_page_image(workspace,page)
@@ -127,6 +133,10 @@ class API:
     def save_cards(self, workspace: Workspace, cards: Annotated[list[Card],Field(min_length=1,max_length=500)], expected_revision: Revision) -> dict:
         """Atomically replace workspace cards with typed drafts or existing-note snapshots. Supply current revision; existing-note updates require note_id."""
         return self.s.save_cards(workspace,[c.model_dump() for c in cards],expected_revision)
+
+    def patch_cards(self, workspace: Workspace, patches: Annotated[list[CardPatch],Field(min_length=1,max_length=500)], expected_revision: Revision) -> dict:
+        """Edit selected drafts by stable ID without resending the card set. Field maps merge; other supplied properties replace their values. Never writes to Anki."""
+        return self.s.patch_cards(workspace,[patch.model_dump() for patch in patches],expected_revision)
 
     def get_cards(self, workspace: Workspace, ids: Ids=None, offset: Offset=0, limit: Limit=20) -> dict:
         """Read a bounded card selection and current revision. For large fields use smaller pages or read_artifact on cards.json."""
@@ -193,6 +203,10 @@ class API:
         """Read persistent queued/running/completed/failed/cancelled/interrupted job state and result artifact references."""
         return self.s.jobs.get(workspace,job_id)
 
+    def list_jobs(self, workspace: Workspace, status: Literal['queued','running','completed','cancelled','failed','interrupted'] | None=None, offset: Offset=0, limit: Limit=20) -> dict:
+        """Rediscover resumable jobs after losing an ID. Returns bounded summaries without repeating large result artifacts."""
+        return self.s.jobs.list(workspace,status,offset,limit)
+
     def cancel_job(self, workspace: Workspace, job_id: Workspace) -> dict:
         """Request cooperative cancellation of extraction/OCR/rendering; native work stops at its next safe boundary."""
         return self.s.jobs.cancel(workspace,job_id)
@@ -218,7 +232,7 @@ async def resolve_roots(server, store):
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
-    read_only={'capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job'}
+    read_only={'capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):
         if name.startswith('_'): continue
         def wrap(method):

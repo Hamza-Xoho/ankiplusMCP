@@ -14,7 +14,7 @@ class Payloads:
             if state['revision']!=expected_revision: raise DomainError('STALE','Workspace revision changed.')
             cards=self._select(workspace,ids)
             if not cards: raise DomainError('CARD','No cards selected.')
-            checks=self.check_cards(workspace,ids)
+            checks=self._check_cards_locked(workspace,ids)
             if checks['blockers']: raise DomainError('VALIDATION','Cards contain technical blockers.','Use check_cards and correct the affected fields.')
             ident=uuid.uuid4().hex; base=f'write/{ident}'
             groups=defaultdict(list); updates=[]; media=[]; suspension=[]

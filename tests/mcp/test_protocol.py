@@ -25,6 +25,10 @@ def test_real_stdio_discovery_cards_errors_and_images(tmp_path):
                 assert not result.isError
                 bad=await session.call_tool('save_cards',{'workspace':w,'cards':[{'id':'n1','fields':{'Text':'x'}}],'expected_revision':0})
                 assert bad.isError and bad.structuredContent['error']['code']=='STALE'
+                patched=await session.call_tool('patch_cards',{'workspace':w,'patches':[{'id':'n1','changes':{'fields':{'Text':'{{c1::Sodium}} crosses the membrane'}}}],'expected_revision':1})
+                assert not patched.isError, patched.content
+                assert patched.structuredContent['changed_ids']==['n1']
+                assert patched.structuredContent['revision']==2
                 bad=await session.call_tool('read_artifact',{'workspace':w,'artifact':'../secret'})
                 assert bad.isError
                 result=await session.call_tool('render_cards',{'workspace':w})
@@ -77,4 +81,29 @@ def test_root_cwd_without_roots_grants_nothing(tmp_path):
                 assert bad.isError and error['code']=='SOURCE' and '--source-root' in error['remedy']
                 caps=await session.call_tool('capabilities',{})
                 assert caps.structuredContent['source_roots_origin']=='none' and caps.structuredContent['source_roots']==[]
+    asyncio.run(run())
+
+
+def test_real_stdio_source_evidence_quotes_and_refusals(tmp_path):
+    async def run():
+        params=StdioServerParameters(command=sys.executable,args=['-m','ankiplusmcp','--workspace-root',str(tmp_path/'work'),'--source-root',str(tmp_path)],env={**os.environ,'PYTHONPATH':str(Path(__file__).resolve().parents[2]/'src')})
+        async with stdio_client(params) as (read,write):
+            async with ClientSession(read,write) as session:
+                await session.initialize()
+                created=await session.call_tool('create_workspace',{'mode':'lecture','text':'# Fibroblast\nBasophilic cytoplasm.'})
+                workspace=created.structuredContent['id']
+                sha=created.structuredContent['source']['sha256']
+                started=await session.call_tool('extract_source',{'workspace':workspace})
+                for _ in range(100):
+                    job=await session.call_tool('get_job',{'workspace':workspace,'job_id':started.structuredContent['id']})
+                    if job.structuredContent['status'] not in ('running','queued'):
+                        break
+                    await asyncio.sleep(.02)
+                assert job.structuredContent['status']=='completed'
+                evidence=await session.call_tool('get_source_evidence',{'workspace':workspace,'refs':[{'source_hash':sha,'page':1,'quote':'Basophilic cytoplasm.'}]})
+                assert not evidence.isError, evidence.content
+                assert evidence.structuredContent['evidence'][0]['quote']=='Basophilic cytoplasm.'
+                refused=await session.call_tool('get_source_evidence',{'workspace':workspace,'refs':[{'source_hash':sha,'page':1,'quote':'Invented fact'}]})
+                assert refused.isError
+                assert refused.structuredContent['error']['code']=='SOURCE_REF'
     asyncio.run(run())

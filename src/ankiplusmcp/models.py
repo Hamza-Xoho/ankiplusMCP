@@ -37,6 +37,11 @@ class Card(Model):
         if (self.question is None) != (self.answer is None): raise ValueError('Supply both question and answer HTML.')
         return self
 
+
+class CardPatch(Model):
+    id: Identifier
+    changes: dict[str, object] = Field(min_length=1, max_length=30)
+
 class Region(Model):
     left: float = Field(ge=0,le=1)
     top: float = Field(ge=0,le=1)

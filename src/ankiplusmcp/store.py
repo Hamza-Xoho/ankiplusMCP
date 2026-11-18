@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import uuid
+from datetime import datetime, timezone
 from filelock import FileLock, Timeout
 from cards.common.files import atomic_write
 
@@ -96,6 +97,7 @@ class Store:
             yield manifest
             key = 'artifact_revision' if artifact else 'revision'
             manifest[key] = manifest.get(key, 0) + 1
+            manifest['updated'] = datetime.now(timezone.utc).isoformat()
             self.write_json(ident, 'workspace.json', manifest)
 
     @contextmanager
@@ -123,10 +125,16 @@ class Store:
             if publish is not None:
                 publish()
             current['artifact_revision'] = current.get('artifact_revision', 0) + 1
+            current['updated'] = datetime.now(timezone.utc).isoformat()
             self.write_json(ident, 'workspace.json', current)
 
     def get(self, ident):
-        return self.read_json(ident, 'workspace.json')
+        manifest = self.read_json(ident, 'workspace.json')
+        manifest.setdefault('created', None)
+        manifest.setdefault('updated', None)
+        source = manifest.get('source') or {}
+        manifest.setdefault('label', source.get('name') or ('Cards' if manifest.get('mode')=='cards' else 'Lecture'))
+        return manifest
 
     def create(self, mode, source_path=None, text=None):
         if mode not in ('lecture', 'cards'):
@@ -140,7 +148,9 @@ class Store:
             raise DomainError('SOURCE', 'Text must be a string under 64 MiB.')
         ident = uuid.uuid4().hex
         (self.root/ident).mkdir()
-        manifest = {'id':ident, 'mode':mode, 'revision':0, 'source':None}
+        now = datetime.now(timezone.utc).isoformat()
+        manifest = {'id':ident, 'mode':mode, 'revision':0, 'source':None,
+                    'created':now, 'updated':now, 'label':source.name if source else ('Pasted text' if text is not None else 'Cards')}
         if source or text is not None:
             local = self.path(ident, 'input/source'+(source.suffix.lower() if source else '.txt'))
             local.parent.mkdir(parents=True)
@@ -152,8 +162,12 @@ class Store:
         return manifest
 
     def list(self, offset=0, limit=20):
+        if type(offset) is not int or offset<0 or type(limit) is not int or not 1<=limit<=100:
+            raise DomainError('LIMIT','Use a nonnegative offset and a limit between 1 and 100.')
         ids = sorted(p.name for p in self.root.iterdir() if p.is_dir() and not p.is_symlink() and (p/'workspace.json').is_file())
-        return {'workspaces':[self.get(i) for i in ids[offset:offset+limit]], 'total':len(ids)}
+        items=sorted((self.get(ident) for ident in ids),key=lambda item:(item.get('updated') or item.get('created') or '', item['id']),reverse=True)
+        end=offset+limit
+        return {'workspaces':items[offset:end], 'total':len(items), 'next_offset':end if end<len(items) else None}
 
     def import_file(self, ident, filename):
         source = self.source(filename)

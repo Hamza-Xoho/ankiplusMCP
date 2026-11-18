@@ -18,6 +18,8 @@ const USAGE = `ankiplusmcp ${VERSION}
   npx ankiplusmcp uninstall         Remove what init added.
   npx ankiplusmcp doctor [--json]   Check Node, uv, Tesseract and Chromium.
   npx ankiplusmcp setup [--yes]     Install Chromium for card previews.
+  npx ankiplusmcp history [list|show|export|rebuild|import-legacy] [flags]
+                                  Inspect local history; --workspace-root DIR, --json.
   npx ankiplusmcp --version
 
 Server flags: --workspace-root DIR, --source-root DIR (repeatable), --profile NAME, --config FILE, --browser VALUE (auto, chromium, chrome or a path).

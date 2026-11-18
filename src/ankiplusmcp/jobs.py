@@ -3,6 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 import uuid
 from filelock import FileLock, Timeout
 from .store import DomainError
+from .run_models import utc_now
 
 class Jobs:
     def __init__(self, store, workers=2):
@@ -15,7 +16,9 @@ class Jobs:
 
     def submit(self, workspace, operation, callback):
         ident = uuid.uuid4().hex
-        record = {'id':ident,'owner':self.owner,'operation':operation,'status':'queued','progress':'queued','cancel_requested':False}
+        now=utc_now()
+        record = {'id':ident,'owner':self.owner,'operation':operation,'status':'queued','progress':'queued','cancel_requested':False,
+                  'created':now,'updated':now}
         self.store.write_json(workspace, f'jobs/{ident}.json', record)
         self.pool.submit(self._run, workspace, ident, callback)
         return record
@@ -24,6 +27,7 @@ class Jobs:
         with self.store.lock(workspace, 'jobs'):
             record = self.store.read_json(workspace, f'jobs/{ident}.json')
             record.update(changes)
+            record['updated']=utc_now()
             self.store.write_json(workspace, f'jobs/{ident}.json', record)
         return record
 
@@ -68,6 +72,20 @@ class Jobs:
         if record['status'] in ('running','queued'):
             return self._update(workspace, ident, cancel_requested=True)
         return record
+
+    def list(self, workspace, status=None, offset=0, limit=20):
+        if type(offset) is not int or offset<0 or type(limit) is not int or not 1<=limit<=100:
+            raise DomainError('LIMIT','Use a nonnegative offset and a limit between 1 and 100.')
+        if status is not None and status not in ('queued','running','completed','cancelled','failed','interrupted'):
+            raise DomainError('JOB','Unknown job status.')
+        paths=list(self.store.path(workspace,'jobs').glob('*.json'))
+        records=[self.get(workspace,path.stem) for path in paths]
+        records=[record for record in records if status is None or record['status']==status]
+        records.sort(key=lambda record:(record.get('updated') or record.get('created') or '',record['id']),reverse=True)
+        keys=('id','operation','status','created','updated','cancel_requested')
+        summaries=[{**{key:record.get(key) for key in keys},'progress':str(record.get('progress',''))[:300]} for record in records[offset:offset+limit]]
+        end=offset+limit
+        return {'jobs':summaries,'total':len(records),'next_offset':end if end<len(records) else None}
 
     def close(self):
         self.pool.shutdown(wait=True, cancel_futures=False)

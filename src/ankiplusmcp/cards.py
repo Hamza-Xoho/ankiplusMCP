@@ -1,7 +1,7 @@
 """Standalone card persistence, checks and previews; no mandatory lecture state."""
 from pathlib import Path
 import uuid
-from .models import Card
+from .models import Card, CardPatch
 from .store import DomainError, digest
 from . import doctor
 
@@ -36,6 +36,41 @@ class Cards:
             return {'cards':cards[offset:offset+limit], 'total':len(cards), 'revision':self.store.get(workspace)['revision'],
                     'next_offset':offset+limit if offset+limit<len(cards) else None}
 
+    def patch_cards(self, workspace, patches, expected_revision):
+        if not 1 <= len(patches) <= 500:
+            raise DomainError('LIMIT','Patch between 1 and 500 cards.')
+        parsed=[CardPatch.model_validate(patch) for patch in patches]
+        if len({patch.id for patch in parsed}) != len(parsed):
+            raise DomainError('CARD','Duplicate patch identifiers.')
+        with self.store.lock(workspace):
+            if self.store.get(workspace)['revision'] != expected_revision:
+                raise DomainError('STALE','Workspace revision changed.')
+            cards=self._cards(workspace)
+            positions={card['id']:position for position,card in enumerate(cards)}
+            changed=[]
+            for patch in parsed:
+                if patch.id not in positions:
+                    raise DomainError('CARD','Patch names an unknown card.')
+                if not set(patch.changes) <= set(Card.model_fields)-{'id'}:
+                    raise DomainError('CARD','Patch changes an unknown or immutable field.')
+                index=positions[patch.id]; before=cards[index]
+                after={**before,**patch.changes}
+                if 'fields' in patch.changes:
+                    if not isinstance(patch.changes['fields'],dict):
+                        raise DomainError('CARD','Patched fields must be a field-to-text mapping.')
+                    after['fields']={**before['fields'],**patch.changes['fields']}
+                    if after['fields'] != before['fields']:
+                        after['question']=after['answer']=None
+                after=Card.model_validate(after).model_dump()
+                if after != before:
+                    cards[index]=after; changed.append(patch.id)
+            if not changed:
+                return {'revision':expected_revision,'changed_ids':[]}
+        # save_cards repeats the revision precondition after releasing the read
+        # lock, so a concurrent real edit cannot be overwritten by this snapshot.
+        saved=self.save_cards(workspace,cards,expected_revision)
+        return {'revision':saved['revision'],'changed_ids':changed}
+
     def save_omissions(self, workspace, omissions, expected_revision):
         if len(omissions)>500: raise DomainError('LIMIT','At most 500 omissions per workspace.')
         if any(not isinstance(o,dict) or type(o.get('slide')) is not int or o['slide']<1 or not isinstance(o.get('reason'),str) or not o['reason'] for o in omissions):
@@ -45,13 +80,21 @@ class Cards:
         return {'revision':state['revision'],'saved':len(omissions)}
 
     def check_cards(self, workspace, ids=None, house_style=False, coverage=False):
+        with self.store.lock(workspace):
+            return self._check_cards_locked(workspace, ids, house_style, coverage)
+
+    def _check_cards_locked(self, workspace, ids=None, house_style=False, coverage=False):
         from cards.check.lint import lint, CLOZE
         cards = self._select(workspace,ids)
+        from .evidence import EvidenceResolver
+        available = EvidenceResolver(self).available_pages(workspace)
         findings=[]
         for card in cards:
             Card.model_validate(card)
             def finding(code,message,severity='blocker'):
                 findings.append({'code':code,'card_id':card['id'],'message':message,'severity':severity})
+            if available is not None and not set(card['source_ref']) <= available:
+                finding('SOURCE_REF','Source reference names a page or section absent from the extraction.')
             from .validation import cloze_errors, io_errors
             if card['kind']=='cloze':
                 for message in cloze_errors(' '.join(card['fields'].values())):
@@ -68,11 +111,15 @@ class Cards:
             data=self.store.read_json(workspace,self.engine(workspace)+'/source/slides.json')
             objectives=self.store.read_json(workspace,self.engine(workspace)+'/source/objectives.json')['objectives']
             skips=self.store.read_json(workspace,'omissions.json') if self.store.path(workspace,'omissions.json').exists() else []
-            coverage_result,_=summarize(cards,skips,[s['n'] for s in data['slides']],objectives)
+            rejected=[item for item in skips if item.get('reason')=='rejected_in_review']
+            intentional=[item for item in skips if item.get('reason')!='rejected_in_review']
+            coverage_result,_=summarize(cards,intentional,[s['n'] for s in data['slides']],objectives)
+            coverage_result['review_rejected_omissions']=rejected
             for objective in coverage_result['objectives_without_t1']:
                 findings.append({'code':'COVERAGE','severity':'warn','message':f'Objective {objective} has no tier-1 card.'})
         return {'findings':findings,'blockers':sum(f['severity']=='blocker' for f in findings),
                 'coverage':coverage_result,'checked':len(cards),'house_style':house_style,
+                'source_refs_checked':available is not None,
                 'source_accuracy_verified':False}
 
     def render_cards(self, workspace, ids=None, front=None, back=None, css=None, per_sheet=8, desktop_sample=0, light=False):
