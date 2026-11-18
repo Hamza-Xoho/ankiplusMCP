@@ -148,12 +148,12 @@ def test_cancel_mid_extraction_then_retry(tmp_path, monkeypatch):
 
 
 def test_source_changed_during_extraction_publishes_nothing(tmp_path, monkeypatch):
-    from ankiplusmcp import sources
-    s, w = lecture(tmp_path); real = sources.digest; calls = []
+    from ankiplusmcp import publication
+    s, w = lecture(tmp_path); real = publication.digest; calls = []
     def digest(path):          # the first check sees the real hash, the check at publish time does not
         calls.append(path)
         return real(path) if len(calls) == 1 else 'changed'
-    monkeypatch.setattr(sources, 'digest', digest)
+    monkeypatch.setattr(publication, 'digest', digest)
     job = s.extract_source(w)
     for _ in range(300):
         record = s.jobs.get(w, job['id'])

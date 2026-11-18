@@ -100,34 +100,6 @@ class Store:
             manifest['updated'] = datetime.now(timezone.utc).isoformat()
             self.write_json(ident, 'workspace.json', manifest)
 
-    @contextmanager
-    def artifact_work(self, ident, *, inputs=(), source=None, cancel=None, publish=None):
-        """Snapshot inputs, release the lock for native work, validate on publication."""
-        with self.lock(ident):
-            state = self.get(ident)
-            original_source = state.get('source')
-            if source is not None and source != original_source:
-                raise DomainError('SOURCE_CHANGED', 'Source changed before artifact work started.')
-            fingerprints = {name: digest(self.path(ident, name)) for name in inputs}
-        if cancel and cancel():
-            raise DomainError('CANCELLED', 'Cancelled before artifact work.')
-        yield state
-        with self.lock(ident):
-            current = self.get(ident)
-            if cancel and cancel():
-                raise DomainError('CANCELLED', 'Cancelled before artifact publication.')
-            if current.get('source') != original_source:
-                raise DomainError('SOURCE_CHANGED', 'Source changed during artifact work.')
-            if original_source and digest(Path(original_source['path'])) != original_source['sha256']:
-                raise DomainError('SOURCE_CHANGED', 'Source snapshot changed during artifact work.')
-            if any(digest(self.path(ident, name)) != sha for name, sha in fingerprints.items()):
-                raise DomainError('ARTIFACT_CHANGED', 'Artifact input changed during native work.')
-            if publish is not None:
-                publish()
-            current['artifact_revision'] = current.get('artifact_revision', 0) + 1
-            current['updated'] = datetime.now(timezone.utc).isoformat()
-            self.write_json(ident, 'workspace.json', current)
-
     def get(self, ident):
         manifest = self.read_json(ident, 'workspace.json')
         manifest.setdefault('created', None)

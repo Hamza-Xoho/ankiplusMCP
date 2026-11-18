@@ -87,3 +87,98 @@ def test_publication_path_containment(env,path,tmp_path):
     ticket=s.publisher.capture(w)
     with pytest.raises(DomainError): s.publisher.publish(ticket,json_records={path:{}})
     assert s.store.get(w).get('artifact_revision',0)==0
+
+@pytest.mark.parametrize('operation',['ocr','occlusion','export'])
+def test_native_operation_rejects_changed_dependency(tmp_path,monkeypatch,operation):
+    from PIL import Image
+    from test_sources import wait
+    import pymupdf
+    s=Service(tmp_path/'data',[tmp_path])
+    try:
+        pdf=tmp_path/'source.pdf'
+        with pymupdf.open() as doc:
+            doc.new_page().insert_text((50,50),'Test page'); doc.save(pdf)
+        w=s.store.create('lecture',source_path=str(pdf))['id']
+        image=tmp_path/'image.png'; Image.new('RGB',(60,60),'white').save(image)
+        artifact=s.import_image(w,str(image))['artifact']
+        if operation=='export':
+            import pymupdf
+            original=pymupdf.Page.get_pixmap
+            def altered(*a,**kw):
+                result=original(*a,**kw); p=Path(s.store.get(w)['source']['path']);p.chmod(0o600);p.write_bytes(b'changed'); return result
+            monkeypatch.setattr(pymupdf.Page,'get_pixmap',altered)
+            job=s.export_figures(w,whole_page=True)
+        elif operation=='ocr':
+            from cards.extract import ocr
+            def altered(*a,**kw): s.store.path(w,artifact).write_bytes(b'changed'); return {'regions':[]}
+            monkeypatch.setattr(ocr,'extract',altered); job=s.ocr_image(w,artifact)
+        else:
+            from cards import figures
+            original=figures.write_images
+            def altered(*a,**kw):
+                result=original(*a,**kw); s.store.path(w,artifact).write_bytes(b'changed'); return result
+            monkeypatch.setattr(figures,'write_images',altered)
+            with pytest.raises(DomainError,match='ARTIFACT_CHANGED'):
+                s.build_occlusion(w,artifact,[{'left':.1,'top':.1,'width':.2,'height':.2}])
+            return
+        for _ in range(300):
+            import time
+            status=s.jobs.get(w,job['id'])
+            if status['status'] not in ('queued','running'): break
+            time.sleep(.01)
+        assert status['status']=='failed'
+        assert status['error']['code']==('SOURCE_CHANGED' if operation=='export' else 'ARTIFACT_CHANGED')
+        assert s.store.get(w)['revision']==0
+    finally: s.close()
+
+
+def test_cached_extraction_keeps_artifact_epoch(tmp_path):
+    from test_sources import lecture,wait
+    s,w=lecture(tmp_path)
+    try:
+        wait(s,w,s.extract_source(w)); epoch=s.store.get(w)['artifact_revision']
+        assert wait(s,w,s.extract_source(w))['cached'] is True
+        assert s.store.get(w)['artifact_revision']==epoch
+    finally: s.close()
+
+
+def test_native_operation_cancel_preserves_prior_artifacts(env,monkeypatch):
+    from PIL import Image
+    from cards.extract import ocr
+    s,w=env; target=s.store.path(w,'media/test.png'); target.parent.mkdir(); Image.new('RGB',(20,20)).save(target)
+    prior=s.store.path(w,'prior'); prior.write_bytes(b'history')
+    entered=Event(); release=Event()
+    def slow(*a,**kw): entered.set(); assert release.wait(3); return {'regions':[]}
+    monkeypatch.setattr(ocr,'extract',slow)
+    job=s.ocr_image(w,'media/test.png')
+    try:
+        assert entered.wait(1); s.jobs.cancel(w,job['id'])
+    finally: release.set()
+    s.close()
+    assert s.jobs.get(w,job['id'])['status']=='cancelled'
+    assert prior.read_bytes()==b'history' and s.store.get(w).get('artifact_revision',0)==0
+
+
+def test_native_failure_preserves_retained_history(env,monkeypatch):
+    from PIL import Image
+    from cards.extract import ocr
+    s,w=env; target=s.store.path(w,'media/test.png'); target.parent.mkdir(); Image.new('RGB',(20,20)).save(target)
+    s.store.path(w,'history').write_text('permanent')
+    monkeypatch.setattr(ocr,'extract',lambda *a,**kw: (_ for _ in ()).throw(RuntimeError('native failure')))
+    job=s.ocr_image(w,'media/test.png'); s.close()
+    assert s.jobs.get(w,job['id'])['status']=='failed'
+    assert s.store.path(w,'history').read_text()=='permanent'
+
+
+def test_ocr_captures_input_before_queue(env,monkeypatch):
+    from PIL import Image
+    from cards.extract import ocr
+    s,w=env; target=s.store.path(w,'media/test.png'); target.parent.mkdir(); Image.new('RGB',(20,20)).save(target)
+    submit=s.jobs.submit
+    def changed(*a,**kw):
+        Image.new('RGB',(20,20),'white').save(target)
+        return submit(*a,**kw)
+    monkeypatch.setattr(s.jobs,'submit',changed)
+    monkeypatch.setattr(ocr,'extract',lambda *a,**kw:{'regions':[]})
+    job=s.ocr_image(w,'media/test.png'); s.close()
+    assert s.jobs.get(w,job['id'])['status']=='failed'

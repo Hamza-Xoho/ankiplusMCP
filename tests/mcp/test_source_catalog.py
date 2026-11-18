@@ -87,3 +87,27 @@ def test_changed_source_refuses_catalog(tmp_path):
         path=Path(s.store.get(w)['source']['path']); path.chmod(0o600); path.write_text('changed')
         with pytest.raises(DomainError,match='SOURCE_CHANGED'): s.source_catalog.snapshot(w)
     finally: s.close()
+
+
+def test_overlapping_extractions_keep_other_partial_marker(tmp_path,monkeypatch):
+    from cards import extract
+    from threading import Event
+    s=Service(tmp_path/'data',[tmp_path]); first=Event();second=Event();release1=Event();release2=Event()
+    original=extract.extract_source
+    def paused(*a,**kw):
+        ready=kw['on_text_ready']; number=a[2]
+        def callback(data):
+            ready(data); (first if number=='1' else second).set()
+            assert (release1 if number=='1' else release2).wait(4)
+        kw['on_text_ready']=callback
+        return original(*a,**kw)
+    monkeypatch.setattr(extract,'extract_source',paused)
+    try:
+        w=s.store.create('lecture',text='# First\nOne\n\n# Second\nTwo')['id']
+        a=s.extract_source(w,'1'); assert first.wait(2)
+        b=s.extract_source(w,'2'); assert second.wait(2)
+        marker=s.store.read_json(w,'source-partial.json'); assert marker['job']==b['id']
+        release1.set(); wait(s,w,a)
+        assert s.store.read_json(w,'source-partial.json')==marker
+        release2.set(); wait(s,w,b)
+    finally: release1.set(); release2.set(); s.close()

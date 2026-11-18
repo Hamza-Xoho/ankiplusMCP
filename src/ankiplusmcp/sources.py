@@ -30,10 +30,10 @@ class Sources:
             from cards import extract
             # 1. Under the lock: reuse a matching earlier extraction.
             with self.store.lock(workspace):
-                state = self.store.get(workspace)
+                ticket = self.publisher.capture_locked(workspace)
+                state = ticket.manifest
                 path = Path(state['source']['path']); sha = state['source']['sha256']
                 if cancel(): raise DomainError('CANCELLED','Cancelled.')
-                if digest(path) != sha: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
                 previous=state.get('source_engine')
                 if previous and self.store.path(workspace,previous+'/source/slides.json').is_file():
                     cached=self.store.read_json(workspace,previous+'/source/slides.json')
@@ -63,14 +63,16 @@ class Sources:
             def text_ready(data):
                 # The marker is not a revision: it only lets reads answer from the early text.
                 self.store.write_json(workspace,prefix+'/source/slides.partial.json',data)
-                self.store.write_json(workspace,'source-partial.json',{'prefix':prefix,'job':getattr(report,'job',None)})
+                with self.store.lock(workspace):
+                    self.store.write_json(workspace,'source-partial.json',{'prefix':prefix,'job':getattr(report,'job',None)})
                 ready.append(1)
                 report(early+f'figures 0/{sum(len(slide["figures"]) for slide in data["slides"])}')
             def clear_marker():
-                # Compare-then-remove is not atomic: the worst case is losing a concurrent run's early text, never serving stale data.
+                # Marker replacement and compare/remove share the workspace lock.
                 try:
-                    if self.store.read_json(workspace,'source-partial.json').get('prefix')==prefix:
-                        self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
+                    with self.store.lock(workspace):
+                        if self.store.read_json(workspace,'source-partial.json').get('prefix')==prefix:
+                            self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
                 except (DomainError,OSError): pass
             try:
                 try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr', on_text_ready=text_ready)
@@ -79,13 +81,8 @@ class Sources:
                     # The extractor reports a missing OCR program as its own E24; name the fix instead.
                     if getattr(exc,'code',None)=='E24' and not doctor.have('tesseract'): doctor.require('tesseract')
                     raise
-                # 3. Publish: the source must be the one we read.
-                with self.store.edit(workspace, artifact=True) as state:
-                    if cancel(): raise DomainError('CANCELLED','Cancelled after extraction; cached artifacts may remain.')
-                    # Compare with the hash phase 1 checked: that is the file the extractor read.
-                    if digest(Path(state['source']['path'])) != sha: raise DomainError('SOURCE_CHANGED','Source snapshot changed.')
-                    data = self.store.read_json(workspace,prefix+'/source/slides.json')
-                    state['source_engine']=prefix
+                data = self.store.read_json(workspace,prefix+'/source/slides.json')
+                self.publisher.publish(ticket,manifest_changes={'source_engine':prefix},cancel=cancel)
             finally: clear_marker()
             return {'_committed':True,'slide_count':data['slide_count'], 'map':prefix+'/source/map.md', 'summary':prefix+'/source/slides_summary.json'}
         return self.jobs.submit(workspace,'extract_source',run)
@@ -137,13 +134,14 @@ class Sources:
     def ocr_image(self, workspace, artifact, min_conf=20, min_len=2, group=True, pad=.004):
         doctor.require('tesseract')
         self.image_bytes(workspace,artifact)  # verify image and size before OCR
+        ticket=self.publisher.capture(workspace,inputs={artifact:'ARTIFACT_CHANGED'})
         def run(cancel, report):
             from cards.extract.ocr import extract
-            with self.store.artifact_work(workspace, inputs=[artifact], cancel=cancel):
-                if cancel(): raise DomainError('CANCELLED','Cancelled.')
-                result = extract(self.store.path(workspace,artifact),min_conf=min_conf,min_len=min_len,group=group,pad=pad)
-                name = f'ocr/{uuid.uuid4().hex}.json'; self.store.write_json(workspace,name,result)
-                return {'artifact':name, 'region_count':len(result['regions'])}
+            if cancel(): raise DomainError('CANCELLED','Cancelled.')
+            result = extract(self.store.path(workspace,artifact),min_conf=min_conf,min_len=min_len,group=group,pad=pad)
+            name = f'ocr/{uuid.uuid4().hex}.json'; self.store.write_json(workspace,name,result)
+            self.publisher.publish(ticket,cancel=cancel)
+            return {'_committed':True,'artifact':name, 'region_count':len(result['regions'])}
         return self.jobs.submit(workspace,'ocr_image',run)
 
     def build_occlusion(self, workspace, artifact, regions, mode='one', keep=None):
@@ -153,15 +151,16 @@ class Sources:
         self.image_bytes(workspace,artifact)
         parsed = parse_regions(regions,','.join(map(str,keep)) if keep is not None else None)
         if not parsed: raise DomainError('REGIONS','Supply at least one region.')
-        with self.store.artifact_work(workspace, inputs=[artifact]):
-            ident = uuid.uuid4().hex
-            media, preview = f'media/{ident}.png',f'media/{ident}_preview.png'
-            self.store.path(workspace,media).parent.mkdir(exist_ok=True)
-            with Image.open(self.store.path(workspace,artifact)) as im:
-                write_images(im.convert('RGB'),parsed,self.store.path(workspace,media),self.store.path(workspace,preview))
-            result = {'fields':{'Image':f'<img src="{ident}.png">','Occlusion':occlusion_markup(parsed,mode)},
-                      'media':[{'path':media,'filename':ident+'.png'}], 'preview':preview, 'regions':parsed}
-            self.store.write_json(workspace,f'occlusions/{ident}.json',result)
+        ticket=self.publisher.capture(workspace,inputs={artifact:'ARTIFACT_CHANGED'})
+        ident = uuid.uuid4().hex
+        media, preview = f'media/{ident}.png',f'media/{ident}_preview.png'
+        self.store.path(workspace,media).parent.mkdir(exist_ok=True)
+        with Image.open(self.store.path(workspace,artifact)) as im:
+            write_images(im.convert('RGB'),parsed,self.store.path(workspace,media),self.store.path(workspace,preview))
+        result = {'fields':{'Image':f'<img src="{ident}.png">','Occlusion':occlusion_markup(parsed,mode)},
+                  'media':[{'path':media,'filename':ident+'.png'}], 'preview':preview, 'regions':parsed}
+        self.store.write_json(workspace,f'occlusions/{ident}.json',result)
+        self.publisher.publish(ticket)
         return result
 
     def resolve_target(self, filename='', course=None, number=None, title=None, subject=None, system=None, existing_decks=None, legacy=False):
@@ -178,24 +177,25 @@ class Sources:
     def export_figures(self, workspace, pages=None, zoom=4, min_frac=.05, whole_page=False):
         source=self.store.get(workspace)['source']
         if not source or Path(source['path']).suffix!='.pdf': raise DomainError('SOURCE','Figure export requires a PDF.')
+        ticket=self.publisher.capture(workspace)
         def run(cancel, report):
             import pymupdf
-            with self.store.artifact_work(workspace, source=source, cancel=cancel):
-                prefix=f'exports/{uuid.uuid4().hex}'; figures=[]
-                with pymupdf.open(source['path']) as doc:
-                    if len(doc)>500: raise DomainError('LIMIT','PDF exceeds 500 pages.')
-                    for number in selection(pages,list(range(1,len(doc)+1))):
-                        if cancel(): raise DomainError('CANCELLED','Cancelled.')
-                        page=doc[number-1]; area=max(1,abs(page.rect.get_area()))
-                        rects=[page.rect] if whole_page else list({tuple(r):r for im in page.get_images(full=True) for r in page.get_image_rects(im[0]) if abs(r.get_area())/area>=min_frac}.values())
-                        for index,rect in enumerate(sorted(rects,key=lambda r:-abs(r.get_area())),1):
-                            if rect.width*rect.height*zoom**2>20_000_000: raise DomainError('LIMIT','Raster exceeds 20 million pixels.','Reduce zoom.')
-                            relative=f'{prefix}/p{number:03d}_fig{index}.png'
-                            path=self.store.path(workspace,relative); path.parent.mkdir(parents=True,exist_ok=True)
-                            pix=page.get_pixmap(clip=rect,matrix=pymupdf.Matrix(zoom,zoom),alpha=False); pix.save(path)
-                            figures.append({'artifact':relative,'slide':number,'width':pix.width,'height':pix.height})
-                self.store.write_json(workspace,prefix+'/manifest.json',figures)
-                return {'figures':figures,'manifest':prefix+'/manifest.json'}
+            prefix=f'exports/{uuid.uuid4().hex}'; figures=[]
+            with pymupdf.open(source['path']) as doc:
+                if len(doc)>500: raise DomainError('LIMIT','PDF exceeds 500 pages.')
+                for number in selection(pages,list(range(1,len(doc)+1))):
+                    if cancel(): raise DomainError('CANCELLED','Cancelled.')
+                    page=doc[number-1]; area=max(1,abs(page.rect.get_area()))
+                    rects=[page.rect] if whole_page else list({tuple(r):r for im in page.get_images(full=True) for r in page.get_image_rects(im[0]) if abs(r.get_area())/area>=min_frac}.values())
+                    for index,rect in enumerate(sorted(rects,key=lambda r:-abs(r.get_area())),1):
+                        if rect.width*rect.height*zoom**2>20_000_000: raise DomainError('LIMIT','Raster exceeds 20 million pixels.','Reduce zoom.')
+                        relative=f'{prefix}/p{number:03d}_fig{index}.png'
+                        path=self.store.path(workspace,relative); path.parent.mkdir(parents=True,exist_ok=True)
+                        pix=page.get_pixmap(clip=rect,matrix=pymupdf.Matrix(zoom,zoom),alpha=False); pix.save(path)
+                        figures.append({'artifact':relative,'slide':number,'width':pix.width,'height':pix.height})
+            self.store.write_json(workspace,prefix+'/manifest.json',figures)
+            self.publisher.publish(ticket,cancel=cancel)
+            return {'_committed':True,'figures':figures,'manifest':prefix+'/manifest.json'}
         return self.jobs.submit(workspace,'export_figures',run)
 
     def measure_usage(self, workspace, transcript):
@@ -206,7 +206,8 @@ class Sources:
         for sub in source.with_suffix('').glob('subagents/agent-*.jsonl'):
             self.store.source(str(sub))
             self.store.source(str(sub.with_suffix('.meta.json')))
-        with self.store.artifact_work(workspace):
-            prefix=f'usage/{uuid.uuid4().hex}'
-            result=meter.run(SimpleNamespace(build=None,session=str(source),latest=None,out=str(self.store.path(workspace,prefix)),line=False))
+        ticket=self.publisher.capture(workspace)
+        prefix=f'usage/{uuid.uuid4().hex}'
+        result=meter.run(SimpleNamespace(build=None,session=str(source),latest=None,out=str(self.store.path(workspace,prefix)),line=False))
+        self.publisher.publish(ticket)
         return {'format':'claude_code','summary':result.lines,'json':prefix+'/cost.json','markdown':prefix+'/cost.md'}
