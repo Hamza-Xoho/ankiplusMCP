@@ -16,7 +16,7 @@ def test_evidence_returns_actual_quote_with_source_identity_and_section(tmp_path
     from ankiplusmcp.evidence import EvidenceRef, EvidenceResolver
     s, w, sha = setup_source(tmp_path)
     try:
-        evidence = EvidenceResolver(s).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='Flat branched cell, with basophilic cytoplasm.')])[0]
+        evidence = EvidenceResolver(s.source_catalog).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='Flat branched cell, with basophilic cytoplasm.')])[0]
         assert evidence.quote == 'Flat branched cell, with basophilic cytoplasm.'
         assert evidence.page == 1
         assert evidence.source_hash == sha
@@ -31,7 +31,7 @@ def test_unsupported_quote_wrong_page_and_changed_source_are_refused(tmp_path):
     from ankiplusmcp.evidence import EvidenceRef, EvidenceResolver
     s, w, sha = setup_source(tmp_path)
     try:
-        resolver = EvidenceResolver(s)
+        resolver = EvidenceResolver(s.source_catalog)
         for reference in [EvidenceRef(source_hash=sha, page=1, quote='Invented scientific fact'),
                           EvidenceRef(source_hash=sha, page=99, quote='Fibroblast'),
                           EvidenceRef(source_hash='f' * 64, page=1, quote='Fibroblast')]:
@@ -45,7 +45,7 @@ def test_whitespace_tolerant_quote_is_returned_from_original_text(tmp_path):
     from ankiplusmcp.evidence import EvidenceRef, EvidenceResolver
     s, w, sha = setup_source(tmp_path)
     try:
-        quote = EvidenceResolver(s).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic   cytoplasm.\nOval nucleus')])[0].quote
+        quote = EvidenceResolver(s.source_catalog).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic   cytoplasm.\nOval nucleus')])[0].quote
         assert quote == 'basophilic cytoplasm.\nOval nucleus'
     finally:
         s.close()
@@ -58,7 +58,7 @@ def test_multiple_passages_remain_separate_and_ocr_is_labelled(tmp_path):
         prefix, data, _ = s.source_data(w)
         data['slides'][0]['flags'] = ['scan', 'image_only']
         s.store.write_json(w, prefix + '/source/slides.json', data)
-        result = EvidenceResolver(s).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm'),
+        result = EvidenceResolver(s.source_catalog).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm'),
                                                  EvidenceRef(source_hash=sha, page=2, quote='Formation of fibres.')])
         assert len(result) == 2
         assert result[0].extraction_origin == 'ocr'
@@ -71,7 +71,7 @@ def test_figure_only_reference_does_not_invent_a_quote(tmp_path):
     from ankiplusmcp.evidence import EvidenceRef, EvidenceResolver
     s, w, sha = setup_source(tmp_path)
     try:
-        result = EvidenceResolver(s).resolve(w, [EvidenceRef(source_hash=sha, page=1)])[0]
+        result = EvidenceResolver(s.source_catalog).resolve(w, [EvidenceRef(source_hash=sha, page=1)])[0]
         assert result.quote is None
         assert result.title == 'Fibroblast'
     finally:
@@ -93,7 +93,7 @@ def test_pdf_page_and_printed_label_are_distinct(tmp_path):
         workspace = s.store.create('lecture', source_path=str(source))['id']
         wait(s, workspace, s.extract_source(workspace))
         sha = s.store.get(workspace)['source']['sha256']
-        evidence = EvidenceResolver(s).resolve(workspace, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm')])[0]
+        evidence = EvidenceResolver(s.source_catalog).resolve(workspace, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm')])[0]
         assert evidence.page == 1
         assert evidence.page_label == 'vii'
         assert evidence.location_kind == 'pdf_page'
@@ -129,10 +129,10 @@ def test_earlier_chapter_evidence_and_card_refs_survive_later_extraction(tmp_pat
     s, w, sha = setup_source(tmp_path)
     try:
         wait(s, w, s.extract_source(w, '1'))
-        original = EvidenceResolver(s).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm')])[0]
+        original = EvidenceResolver(s.source_catalog).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm')])[0]
         s.save_cards(w, [{'id': 'n1', 'fields': {'Text': '{{c1::Fibroblast}}'}, 'source_ref': [1]}], 0)
         wait(s, w, s.extract_source(w, '2'))
-        revisited = EvidenceResolver(s).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm')])[0]
+        revisited = EvidenceResolver(s.source_catalog).resolve(w, [EvidenceRef(source_hash=sha, page=1, quote='basophilic cytoplasm')])[0]
         assert revisited.quote == original.quote
         assert revisited.extraction == original.extraction
         assert not any(f['code'] == 'SOURCE_REF' for f in s.check_cards(w)['findings'])

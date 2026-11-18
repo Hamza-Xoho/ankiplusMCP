@@ -11,42 +11,17 @@ from . import doctor
 
 class Sources:
     def engine(self, workspace):
-        return self.store.get(workspace).get("source_engine", "engine")
+        return self.source_catalog.snapshot_locked(workspace).active_prefix
 
     def pending_marker(self, workspace):
-        """The text-ready marker {'prefix','job'} while its job is queued or running, else None."""
-        if not self.store.path(workspace,'source-partial.json').is_file(): return None
-        try:
-            marker=self.store.read_json(workspace,'source-partial.json')
-            try: running=self.jobs.get(workspace,marker['job'])['status'] in ('queued','running')
-            except DomainError: running=False
-            if running and isinstance(marker['prefix'],str): return marker
-            # Its job is gone (killed server, unknown id): behave as if no extraction had started.
-            self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
-        except (DomainError,KeyError,TypeError,OSError): pass
-        return None
-
-    def published(self, workspace):
-        return self.store.path(workspace,self.engine(workspace)+'/source/slides.json').is_file()
+        return self.source_catalog.pending_marker(workspace)
 
     def source_data(self, workspace):
-        """(prefix, slides data, labels_pending). A published extraction beats a text-ready marker."""
-        prefix=self.engine(workspace)
-        marker=None if self.published(workspace) else self.pending_marker(workspace)
-        if marker:
-            data=self.store.read_json(workspace,marker['prefix']+'/source/slides.partial.json')
-            for slide in data['slides']:
-                for figure in slide['figures']:
-                    figure['ocr_labels']=figure['repeated_labels']=None   # not read yet, unlike []: read, none found
-            return marker['prefix'],data,True
-        return prefix,self.store.read_json(workspace,prefix+'/source/slides.json'),False
+        item = self.source_catalog.snapshot_locked(workspace).current()
+        return item.prefix, item.data, item.labels_pending
 
     def require_extraction(self, workspace, needs):
-        """Refuse, retryably, while only the early text exists and no finished extraction is published."""
-        marker=None if self.published(workspace) else self.pending_marker(workspace)
-        if marker:
-            raise DomainError('LABELS_PENDING',f'Figure labels are still being read by job {marker["job"]}; {needs} needs the finished extraction.',
-                              'Wait until get_job reports that job completed, then retry.')
+        self.source_catalog.snapshot_locked(workspace).current(require_complete=True)
 
     def extract_source(self, workspace, slides=None):
         manifest = self.store.get(workspace)
@@ -134,8 +109,7 @@ class Sources:
         try:
             with self.store.artifact_work(workspace, publish=lambda: os.replace(pending['temporary'], pending['target'])) as state:
                 # Stage expensive output; a rejected publication must preserve the previous page.
-                from .evidence import EvidenceResolver
-                candidates=EvidenceResolver(self).page_candidates(workspace,state['source'],page)
+                candidates=self.source_catalog.snapshot(workspace).candidates(page)
                 if not candidates:
                     raise DomainError('SOURCE_REF','Page is absent from the retained source extractions.')
                 prefix, _, _ = candidates[0]
@@ -149,9 +123,7 @@ class Sources:
                 pending['temporary'].unlink(missing_ok=True)
 
     def labels_pending_for(self, workspace, artifact):
-        """True when `artifact` lies in an extraction whose figure labels are still being read."""
-        marker=self.pending_marker(workspace)
-        return bool(marker) and self.store.path(workspace,marker['prefix']) in self.store.path(workspace,artifact).parents
+        return self.source_catalog.snapshot_locked(workspace).labels_pending_for(artifact)
 
     def list_figures(self, workspace, offset=0, limit=20):
         prefix, data, pending = self.source_data(workspace)

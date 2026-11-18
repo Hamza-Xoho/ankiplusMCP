@@ -19,7 +19,7 @@ def setup(tmp_path, preferences=None):
         config.confirm(config.propose(preferences, 1).id)
     runs = RunStore(tmp_path / 'data')
     run = runs.start(workspace, SourceSelection(source_hash=sha, pages=[1]), config.read().config_version)
-    coverage = CoverageStore(runs, config, EvidenceResolver(service))
+    coverage = CoverageStore(runs, config, EvidenceResolver(service.source_catalog))
     snapshot = CollectionSnapshot(collection_id='test-collection', query='fibroblast', notes=[
         ExistingNote(note_id=101, card_ids=[201, 202], suspended_card_ids=[202], fields={'Text': 'Fibroblast'}),
         ExistingNote(note_id=102, card_ids=[203], fields={'Text': 'Cell'})])

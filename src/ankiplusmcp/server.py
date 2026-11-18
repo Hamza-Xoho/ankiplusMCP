@@ -83,7 +83,7 @@ class API:
 
     def get_source_evidence(self, workspace: Workspace, refs: Annotated[list[EvidenceRef],Field(min_length=1,max_length=20)]) -> dict:
         """Resolve source-hash/page citations to exact stored quotations, with OCR and physical-page labels. Text sections are not PDF pages."""
-        return {'evidence':[item.model_dump() for item in EvidenceResolver(self.s).resolve(workspace,refs)],
+        return {'evidence':[item.model_dump() for item in EvidenceResolver(self.s.source_catalog).resolve(workspace,refs)],
                 'source_accuracy_verified':False}
 
     def get_page_image(self, workspace: Workspace, page: Annotated[int,Field(ge=1,le=500)]) -> dict:

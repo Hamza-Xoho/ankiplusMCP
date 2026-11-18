@@ -25,7 +25,7 @@ class Review:
             result['sheets']=preview['sheets']
         else:
             result['cards']=selected
-            result['source_available']=self.store.path(workspace,self.engine(workspace)+'/source/slides.json').is_file()
+            result['source_available']=any(not d.labels_pending and d.prefix == snap.active_prefix for snap in [self.source_catalog.snapshot_locked(workspace)] for d in snap.datasets)
             result['source_tool']='read_source for cited source_ref slide numbers'
         return result
 
