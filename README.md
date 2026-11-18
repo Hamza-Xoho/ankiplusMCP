@@ -231,3 +231,26 @@ Configure the host to run scripts/run-container.sh with the image revision and s
 media must be imported from the source mount, not arbitrary host paths.
 
 Upstream attribution and MIT terms are retained in [LICENSE](LICENSE).
+
+## Student-workflow refactor in this checkout
+
+This development branch adds source evidence, partial draft edits and separate local history commands. It is not the completed first-release workflow: Desktop interactive review, the verified Anki companion coordinator and onboarding completion still require their compatibility and acceptance work.
+
+- `get_source_evidence` resolves a source hash, physical page/section and optional quotation against stored extraction. It returns the exact source substring, distinguishes printed PDF labels from physical page numbers and labels OCR text. It does not establish factual accuracy.
+- `patch_cards` merges supplied note fields into selected draft IDs, preserves untouched drafts, rejects stale revisions and avoids resending the full set for one correction. It never writes to Anki.
+- `list_jobs` rediscovers job IDs with bounded summaries. Workspaces now have labels and activity timestamps; old unknown dates stay unknown.
+- Coverage decision records preserve source passages, collection snapshot IDs and actual card-vs-note identities. Supplied collection evidence remains explicitly caller-supplied until a live adapter verifies it.
+
+Inspect or export run history separately from card review:
+
+```sh
+.venv/bin/python -m ankiplusmcp history list --workspace-root /absolute/data --json
+.venv/bin/python -m ankiplusmcp history list --workspace-root /absolute/data --card-id 123456 --json
+.venv/bin/python -m ankiplusmcp history show RUN_ID --workspace-root /absolute/data
+.venv/bin/python -m ankiplusmcp history export RUN_ID --workspace-root /absolute/data --output /absolute/run-summary.md
+.venv/bin/python -m ankiplusmcp history import-legacy WORKSPACE_ID --workspace-root /absolute/data --from /absolute/legacy-workspace --json
+```
+
+Exports do not overwrite existing files, and legacy import does not modify the original workspace or invent verification. The new run/configuration/guide libraries are building blocks; installing this branch alone does not automatically wrap every existing workflow in a run record or finish onboarding. The guide writer preserves its personal-notes section and refuses to overwrite other user edits.
+
+See [the approved design](docs/superpowers/specs/2026-11-18-student-workflows-design.md), [implementation plan](docs/superpowers/plans/2026-11-18-student-workflows.md) and [verification checkpoint](docs/refactor/implementation-checkpoint.md). To use this checkout through the launcher, set `ANKIPLUSMCP_PY_SPEC` as documented above; the released version tag does not contain unpushed branch changes.

@@ -15,9 +15,9 @@ Work is on branch `refactor/student-workflows`, starting at `b0f4233`. The full 
 
 ## Verification evidence
 
-- Full suite in the repository's existing public-CI mode: **517 passed, 25 skipped**.
-- Full local contract mode: **261 passed, 1 failed, 23 errors**, with all 24 affected cases requiring unpublished private lecture/transcript fixtures. These are not waived release checks.
-- Launcher: **28 passed**.
+- Full suite in the repository's existing public-CI mode: **557 passed, 25 skipped**.
+- Baseline full local contract mode: **261 passed, 1 failed, 23 errors**, with all 24 affected cases requiring unpublished private lecture/transcript fixtures. These are not waived release checks.
+- Launcher: **29 passed**.
 - Existing host hook verifier: **42/42 passed**.
 - Frozen-contract hashes: **12/12 intact**.
 - CLI snapshot comparison: **IDENTICAL, 66 artifacts and 14 commands**, including frozen dependency environment.
@@ -45,7 +45,7 @@ Execution rulings, including their costs:
 
 ## Remaining implementation and external gates
 
-The new run/configuration libraries are not yet connected to the full user workflow. Source-quote review, existing-coverage decisions, the companion coordinator, exact user approval, interactive review, onboarding/guide and several audit repairs remain outstanding.
+The backing libraries are not yet connected to the full user workflow. Live collection coverage searches, the companion coordinator, exact user approval, the interactive review interface, completed onboarding and several audit repairs remain outstanding. Source evidence, coverage decision recording, separate history access and guide generation are now implemented as described below; their existence is not a claim that the entire workflow is integrated.
 
 The approved design requires proving the actual local Desktop UI + independent maintainer/student reviewers + Anki companion combination before freezing transport/UI implementation. No real Mac/Desktop session or isolated live Anki is available here. Public documentation suggests routes to investigate, but it cannot establish that the complete combination meets the Pro subscription and quality-preservation constraints. See `compatibility.md` for the actual test procedure.
 
@@ -58,3 +58,27 @@ The container's mechanical-only `network_mode: none` is retained. A future compa
 - `d0250f8`: artifact revision isolation and cumulative receipt preservation.
 
 Container and documentation checkpoints follow these commits. No commit has been pushed.
+
+## Continued native implementation
+
+The next locally verified batch adds:
+
+- Exact stored source quotes through `get_source_evidence`, with OCR labels, physical PDF pages and printed page labels. Citations retain extraction identity and can resolve earlier chapters after later selections replace the active extraction. Original page images can likewise be reopened. Source-reference checking uses retained matching source versions.
+- Coverage decision records tied to source selection and supplied collection snapshots. Actual note/card ownership is checked. Uncertain matches follow explicitly saved preferences; disagreements stay pending. Missing selected card IDs never manufacture active coverage. Caller data remains labelled unverified. These records do not execute collection operations.
+- Separate `history` CLI list/search/show/export/rebuild/import commands. Exports cannot overwrite existing files; JSON list results are bounded summaries, and detailed history can be explicitly inspected or exported.
+- `patch_cards` edits one or more drafts without resending the full set, preserving untouched data, invalidating stale cached HTML and refusing stale or malformed updates. Concurrent real edits survive a stale patch attempt; no-op patches preserve revision.
+- Workspace labels, honest creation/activity timestamps, recency pagination and bounded `list_jobs` discovery. Unknown dates in old workspaces stay unknown.
+- Personalised seven-section beginner guide generation, including reasons and workflow-appropriate prompts. Personal notes survive regeneration; other user edits or unrelated existing documents are preserved by refusal. Setup is never presented as verified when supplied capabilities are incomplete. Host onboarding integration is still pending.
+- The Windows Desktop APPDATA configuration-path defect is fixed in platform-simulated launcher tests. This does not establish actual Windows support.
+- Legacy P6 write counts are checked before recording success/completing the phase, leaving mismatches recoverable. Concurrent `build --continue` attempts use a nonblocking per-build lock. Existing report/count semantics and successful CLI artifact output remain unchanged.
+
+Fresh whole-checkpoint review found the earlier-chapter and false-coverage issues above; failing regressions reproduced them, and the fix pass plus full suite passed. No claim is made about untested Mac/Windows host behaviour, live collection writes, independent host reviewers or unavailable private fixtures.
+
+Latest verification: 557 passed and 25 skipped in public-CI mode; 29 launcher tests; 42 hook checks; intact frozen hashes; wheel build; identical 66-artifact/14-command CLI baseline. The reviewed image `fdf008b-dirty` passed the non-root/read-only/network-disabled real OCR/Chromium smoke. Hosted CI runner behaviour remains unverified until a separately authorised push runs it.
+
+Additional execution rulings:
+
+10. Use generic citation `page` plus explicit `location_kind`, rather than calling text sections PDF pages. Cost: callers must use the new typed evidence shape.
+11. Apply explicitly saved preferences to later decisions in the same run, recording the actual configuration version per event. Cost: later authorization must bind relevant current preferences rather than only the initial run version.
+12. Retain source-hash-matching extraction identity/history for chapter citations. Cost: derived-artifact cleanup must respect historical citation dependencies.
+13. Require usable selected card IDs before declaring active coverage. Cost: incomplete caller snapshots stay pending instead of being treated as successful matches.
