@@ -8,6 +8,7 @@ import os
 from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
+from filelock import FileLock, Timeout
 
 from . import state, extract, target, check, render, gate, report
 from .review import packets, apply
@@ -349,6 +350,12 @@ def written(build, data, args):
                              'Action: add each batch with tools.anki.add_notes; apply updates and '
                              'suspend per expected.json; write write/receipts.json',
                              'Resume: cards build --continue'], files=[build.state])
+    expected_path=build.path('write/expected.json')
+    if not expected_path.is_file():
+        raise Refused('E72','write plan missing','restore the write plan before recording success')
+    observed=state.receipt_counts(read_json(receipts))
+    if not state.counts_match_plan(observed,read_json(expected_path)):
+        raise Refused('E72','write counts differ from plan','verify Anki read-back and correct receipts before continuing')
     result = state.record_write(build, state.load(build))
     return finish(build, 'P6', [f'P6: {_first(result, "write recorded")}'])
 
@@ -370,6 +377,14 @@ def run(args):
         build = Build(Path(created.files[0]).parent)
     else:
         build = active_build(args)
+    try:
+        with FileLock(build.path('.build.lock'),timeout=0):
+            return run_locked(build,args)
+    except Timeout as exc:
+        raise Refused('E73','build is busy','wait for the active build operation to finish before continuing') from exc
+
+
+def run_locked(build, args):
     data = state.load(build)
     if data['phase'] == 'done':
         return Result(lines=[f'done · {build.root.name} complete'], files=[build.state])

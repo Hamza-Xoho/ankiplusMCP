@@ -10,6 +10,7 @@ from .common.files import read_json, read_jsonl, write_text
 from .common.errors import Refused, CardsError
 from .common.hashing import sha256_file
 from .common.output import Result
+from .state import counts_match_plan
 
 
 def run(args):
@@ -25,7 +26,7 @@ def run(args):
         raise Refused('E72','write evidence stale','repeat gate, write and Anki verification')
     expected=read_json(b.path('write/expected.json'))
     dup=int(written.get('skipped_duplicate',0))  # drafts Anki's duplicate guard refused; listed in skipped.jsonl
-    if written.get('created',0)+dup!=expected['created'] or any(written.get(k)!=expected[e] for k,e in [('updated','updated'),('suspended','suspend_notes')]):
+    if not counts_match_plan(written,expected):
         raise Refused('E72','write counts differ from plan','verify Anki read-back and record actual counts')
     session=os.environ.get('CLAUDE_SESSION_ID')
     try:

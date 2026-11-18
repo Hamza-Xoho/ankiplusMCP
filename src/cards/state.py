@@ -110,6 +110,20 @@ def next_phase(data):
         return PHASES[PHASES.index(phase)+1]
     return phase
 
+def receipt_counts(receipts):
+    """Observed legacy receipt counts; this does not independently verify Anki."""
+    return {'created':sum(int(batch.get('created',0)) for batch in receipts.get('batches',[])),
+            'updated':len(receipts.get('updates',[])),
+            'skipped_duplicate':sum(int(batch.get('skipped_duplicate',0)) for batch in receipts.get('batches',[])),
+            'suspended':int((receipts.get('suspend') or {}).get('notes',0))}
+
+
+def counts_match_plan(counts, expected):
+    return (counts.get('created',0)+int(counts.get('skipped_duplicate',0))==expected['created']
+            and counts.get('updated')==expected['updated']
+            and counts.get('suspended')==expected['suspend_notes'])
+
+
 def record_write(build, data):
     """Record observed write counts from write/receipts.json; refuses on any failed batch or suspend."""
     path = build.path('write/receipts.json')
@@ -123,8 +137,7 @@ def record_write(build, data):
     rnd = data['review'].get('round', 0)
     from .review.apply import report_path
     reports = [report_path(build, f'review/round{rnd}', who) for who in ('maintainer', 'student')]
-    data['write'] = {**data.get('write', {}), 'created': sum(int(b.get('created', 0)) for b in r.get('batches', [])),
-                     'updated': len(r.get('updates', [])), 'skipped_duplicate': sum(int(b.get('skipped_duplicate', 0)) for b in r.get('batches', [])), 'suspended': int(suspend.get('notes', 0)), 'errors': [], 'status': 'done'}
+    data['write'] = {**data.get('write', {}), **receipt_counts(r), 'errors': [], 'status': 'done'}
     data['review']['independent'] = bool(rnd) and all(p.exists() for p in reports)
     write_json(build.state, data, 'cards state')
     return Result(lines=[f'{data["build_id"]} · write recorded: created {data["write"]["created"]} · updated {data["write"]["updated"]} · suspended {data["write"]["suspended"]}'], files=[build.state])
