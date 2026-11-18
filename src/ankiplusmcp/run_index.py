@@ -43,6 +43,8 @@ class RunIndex:
         db.execute('CREATE INDEX IF NOT EXISTS runs_recency ON runs(updated DESC,id)')
         db.execute('CREATE INDEX IF NOT EXISTS lookup_value ON lookups(kind,value,run_id)')
         db.execute('CREATE TABLE IF NOT EXISTS index_errors (id TEXT PRIMARY KEY, code TEXT)')
+        if 'journal_token' not in {row[1] for row in db.execute('PRAGMA table_info(runs)')}:
+            db.execute('ALTER TABLE runs ADD COLUMN journal_token TEXT')
         return db
 
     def _sync(self, db, *, reset=False):
@@ -51,29 +53,20 @@ class RunIndex:
             db.execute('DELETE FROM lookups')
             db.execute('DELETE FROM runs')
             db.execute('DELETE FROM index_errors')
-        sequences = dict(db.execute('SELECT id,sequence FROM runs'))
-        count = 0
-        for directory in sorted(self.store.directory.iterdir()):
-            if not directory.is_dir() or directory.name.startswith('.'):
-                continue
-            try:
-                path = self.store._path(directory.name)
-                latest = max((int(p.stem) for p in path.glob('[0-9]' * 20 + '.json')), default=0)
-                if sequences.get(directory.name) == latest:
-                    count += 1
-                    continue
-                run = self.store.read(directory.name)
-            except DomainError as exc:
-                db.execute('DELETE FROM lookups WHERE run_id=?', (directory.name,))
-                db.execute('DELETE FROM runs WHERE id=?', (directory.name,))
-                db.execute('INSERT OR REPLACE INTO index_errors VALUES (?,?)', (directory.name, exc.code))
-                continue
-            count += 1
-            db.execute('DELETE FROM index_errors WHERE id=?', (directory.name,))
-            db.execute('INSERT OR REPLACE INTO runs VALUES (?,?,?,?,?,?)',
-                       (run.id, run.selection.source_hash, run.selection.label.casefold(),
-                        run.events[-1].timestamp, run.events[-1].sequence, run.model_dump_json()))
-            db.execute('DELETE FROM lookups WHERE run_id=?', (run.id,))
+        known=dict(db.execute('SELECT id,journal_token FROM runs'))
+        catalog=self.store.catalog(known)
+        present=set(catalog.unchanged_ids) | {item.snapshot.id for item in catalog.changed}
+        for ident in set(known)-present:
+            db.execute('DELETE FROM lookups WHERE run_id=?',(ident,))
+            db.execute('DELETE FROM runs WHERE id=?',(ident,))
+        db.execute('DELETE FROM index_errors')
+        db.executemany('INSERT INTO index_errors (id,code) VALUES (?,?)',sorted(catalog.errors.items()))
+        for item in catalog.changed:
+            run=item.snapshot
+            db.execute('INSERT OR REPLACE INTO runs (id,source_hash,label,updated,sequence,snapshot,journal_token) VALUES (?,?,?,?,?,?,?)',
+                (run.id,run.selection.source_hash,run.selection.label.casefold(),run.events[-1].timestamp,
+                 run.events[-1].sequence,run.model_dump_json(),item.token))
+            db.execute('DELETE FROM lookups WHERE run_id=?',(run.id,))
             values = set()
             for event in run.events:
                 for key in ('note_ids', 'card_ids'):
@@ -84,7 +77,7 @@ class RunIndex:
                     if isinstance(event.payload.get(key), str):
                         values.add((run.id, key, event.payload[key]))
             db.executemany('INSERT INTO lookups VALUES (?,?,?)', sorted(values))
-        return count
+        return len(present)
 
     def rebuild(self) -> int:
         with closing(self._connect()) as db, db:

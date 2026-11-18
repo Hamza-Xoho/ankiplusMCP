@@ -7,9 +7,9 @@ import tempfile
 from pathlib import Path
 from uuid import uuid4
 
-from filelock import FileLock
+from filelock import FileLock, Timeout
 
-from .run_models import EventRecord, Run, RunEvent, RunSnapshot, SourceSelection
+from .run_models import EventRecord, Run, RunEvent, RunSnapshot, SourceSelection, RunCatalog, RunProjection
 from .store import DomainError
 
 
@@ -169,13 +169,36 @@ class RunStore:
         path = self._path(run_id)
         with self._lock(path):
             records = self._records(path)
-            initial = records[0].payload
+            return self._snapshot(run_id, records)
+
+    def _snapshot(self, run_id, records):
+        initial = records[0].payload
+        try:
+            return RunSnapshot(id=run_id, workspace=initial['workspace'],
+                selection=SourceSelection.model_validate(initial['selection']),
+                config_version=initial['config_version'], events=records)
+        except (KeyError, ValueError) as exc:
+            raise DomainError('RUN_CORRUPT', 'Invalid initial run record.') from exc
+
+    def catalog(self, known: dict[str, str] | None = None) -> RunCatalog:
+        known=known or {}; changed=[]; unchanged=[]; errors={}
+        for directory in sorted(self.directory.iterdir()):
+            if directory.name.startswith('.') or not (directory.is_dir() or directory.is_symlink()): continue
+            ident=directory.name
             try:
-                return RunSnapshot(id=run_id, workspace=initial['workspace'],
-                                   selection=SourceSelection.model_validate(initial['selection']),
-                                   config_version=initial['config_version'], events=records)
-            except (KeyError, ValueError) as exc:
-                raise DomainError('RUN_CORRUPT', 'Invalid initial run record.') from exc
+                path=self._path(ident)
+                with self._lock(path):
+                    metadata=[]
+                    for file in sorted(path.glob('[0-9]'*20+'.json')):
+                        if file.is_symlink(): raise DomainError('RUN_CORRUPT','Event is a symbolic link.')
+                        stat=file.stat(); metadata.append((file.name,stat.st_size,stat.st_mtime_ns))
+                    token=hashlib.sha256(_encoded({'events':metadata})).hexdigest()
+                    if known.get(ident)==token: unchanged.append(ident)
+                    else: changed.append(RunProjection(snapshot=self._snapshot(ident,self._records(path)),token=token))
+            except Timeout: errors[ident]='BUSY'
+            except DomainError as exc: errors[ident]=exc.code
+            except OSError: errors[ident]='RUN_CORRUPT'
+        return RunCatalog(changed=changed,unchanged_ids=unchanged,errors=errors)
 
     def save_snapshot(self, run_id: str, name: str, value: dict) -> str:
         path = self._path(run_id)

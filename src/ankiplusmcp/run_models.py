@@ -54,3 +54,14 @@ class RunSnapshot(Model):
 
 
 Run = RunSnapshot
+
+
+class RunProjection(Model):
+    snapshot: RunSnapshot
+    token: str
+
+
+class RunCatalog(Model):
+    changed: list[RunProjection]
+    unchanged_ids: list[str]
+    errors: dict[str, str]
