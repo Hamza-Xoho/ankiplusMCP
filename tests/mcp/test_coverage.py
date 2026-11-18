@@ -42,7 +42,7 @@ def test_existing_coverage_and_suspension_are_logged_with_source(tmp_path):
         assert latest[0].card_ids == [202]
         events = coverage.runs.read(run.id).events
         assert events[-1].payload['evidence_origin'] == 'caller_supplied'
-        assert events[-1].payload['source_evidence'][0]['quote'] == 'basophilic cytoplasm'
+        assert events[-1].payload['decisions'][0]['source_evidence'][0]['quote'] == 'basophilic cytoplasm'
         assert events[-1].payload['independently_verified'] is False
     finally:
         s.close()

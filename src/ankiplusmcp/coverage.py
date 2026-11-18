@@ -1,4 +1,8 @@
 """Inspectably record coverage judgements, without pretending they are verified facts."""
+import hashlib
+import json
+import re
+from uuid import uuid4
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -55,15 +59,33 @@ class CoverageStore:
     def __init__(self, runs: RunStore, config: ConfigStore, evidence: EvidenceResolver):
         self.runs, self.config, self.evidence = runs, config, evidence
 
-    def record(self, run_id: str, snapshot: CollectionSnapshot, decisions: list[CoverageDecision]) -> list[CoverageDecision]:
+    def record(self, run_id: str, snapshot: CollectionSnapshot, decisions: list[CoverageDecision], *, batch_id: str | None = None) -> list[CoverageDecision]:
+        batch_id=uuid4().hex if batch_id is None else batch_id
+        if not isinstance(batch_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}',batch_id):
+            raise DomainError('COVERAGE','Invalid coverage batch identifier.')
+        snapshot=CollectionSnapshot.model_validate(snapshot)
+        supplied=[CoverageDecision.model_validate(d).model_copy(deep=True) for d in decisions]
+        if not 1<=len(supplied)<=100: raise DomainError('LIMIT','Record between 1 and 100 coverage decisions.')
+        request={'run_id':run_id,'snapshot':snapshot.model_dump(),'decisions':[d.model_dump() for d in supplied]}
+        request_digest=hashlib.sha256(json.dumps(request,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode()).hexdigest()
+        event_id='coverage-'+batch_id
+        def existing(run):
+            for event in run.events:
+                if event.id==event_id:
+                    if event.kind!='coverage_batch' or event.payload.get('request_digest')!=request_digest:
+                        raise DomainError('CONFLICT','Coverage batch identifier was reused with changed input.')
+                    return [CoverageDecision.model_validate({k:v for k,v in d.items() if k in CoverageDecision.model_fields}) for d in event.payload['decisions']]
+            return None
         run = self.runs.read(run_id)
+        previous=existing(run)
+        if previous is not None: return previous
         if run.config_version is None:
             raise DomainError('CONFIG', 'Historical run has unknown preferences; start a configured run before making new decisions.')
         # The initial run version is history; explicitly saved preferences govern
         # later decisions, while each event retains the version actually used.
         config = self.config.read()
         snapshot = CollectionSnapshot.model_validate(snapshot)
-        parsed = [CoverageDecision.model_validate(decision).model_copy(deep=True) for decision in decisions]
+        parsed = supplied
         if not 1 <= len(parsed) <= 100:
             raise DomainError('LIMIT', 'Record between 1 and 100 coverage decisions.')
         if len({decision.concept_id for decision in parsed}) != len(parsed):
@@ -119,16 +141,27 @@ class CoverageStore:
                 'config_version': config.config_version,
                 'collection_snapshot': snapshot.model_dump(), 'source_evidence': [item.model_dump() for item in evidence],
                 'evidence_origin': 'caller_supplied', 'independently_verified': False}))
-        # Validate the whole batch before recording anything. Events never execute collection actions.
-        for event in records:
-            self.runs.append(run_id, event)
+        payload={'payload_version':1,'batch_id':batch_id,'request_digest':request_digest,
+            'collection_snapshot':snapshot.model_dump(),'config_version':config.config_version,
+            'decisions':[{**d.model_dump(),'source_evidence':event.payload['source_evidence']} for d,event in zip(parsed,records)],
+            'note_ids':sorted({i for d in parsed for i in d.chosen_note_ids}),
+            'card_ids':sorted({i for d in parsed for i in d.card_ids}),
+            'evidence_origin':'caller_supplied','independently_verified':False}
+        try:
+            self.runs.append(run_id,RunEvent(id=event_id,kind='coverage_batch',payload=payload))
+        except DomainError as exc:
+            if exc.code!='CONFLICT': raise
+            winner=existing(self.runs.read(run_id))
+            if winner is None: raise
+            return winner
         return parsed
 
     def latest(self, run_id: str) -> list[CoverageDecision]:
         decisions = {}
         fields = set(CoverageDecision.model_fields)
         for event in self.runs.read(run_id).events:
-            if event.kind == 'coverage_decision':
-                decision = CoverageDecision.model_validate({key: value for key, value in event.payload.items() if key in fields})
+            payloads=event.payload.get('decisions',[]) if event.kind=='coverage_batch' else [event.payload] if event.kind=='coverage_decision' else []
+            for payload in payloads:
+                decision = CoverageDecision.model_validate({key: value for key, value in payload.items() if key in fields})
                 decisions[decision.concept_id] = decision
         return list(decisions.values())
