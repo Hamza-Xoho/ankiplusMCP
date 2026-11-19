@@ -1,28 +1,31 @@
 # Revision-pinned Mac acceptance packet
 
-Status: final Linux acceptance is being collected for the revisions below. Do not
-interpret this packet as a release, deployment, Mac compatibility pass, actual
-reviewer pass or authorization to operate on any real collection.
+Status: **Linux/T3 implementation and local acceptance complete.** This packet
+prepares real Mac testing. It is not a release, deployment, Mac compatibility
+pass, prescribed reviewer pass or authorization for real collection operations.
 
 ## Exact implementation and artifacts
 
-Primary branch `refactor/student-workflows`: `0fef80eaa711051c802a97f8d767fd81f386acd0`.
+Primary branch `refactor/student-workflows`: `6e9bcf3bfbb6d2c8ec42d484046ebef9fd774a0b`.
 Companion branch `local/collection-identity`: `9fa37516f9987fba6a295bc4915ccb4952248064`.
 A later documentation-only primary commit may contain this packet; these exact
 revisions identify all runtime source being accepted. Do not use the older
 AnkiPlus checkout, historical v0.3.0 registry/Git tag or candidate7523cd0 archives.
 
 Local packet directory:
-`.artifacts/mac-acceptance/0fef80e/` relative to the primary checkout.
+`.artifacts/mac-acceptance/6e9bcf3/` relative to the primary checkout.
 It contains the following actual files, `manifest.json` and `SHA256SUMS`. Transfer
 this directory through an owner-approved channel; no publication is required.
 No credentials, real collections, private documents or verifier keys are included.
+The packet also includes the current handoff documents; their checksums are in
+SHA256SUMS alongside the artifacts.
 
 | File | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `anki-mcp-server-addon-9fa3751.ankiaddon` | 2730581 | `fb5f44aa91b67aa8f72e060577cff265f7cdba2f8d23bea105024f4019c357c9` |
-| `ankiplusmcp-0.3.0-py3-none-any.whl` | 366377 | `474deb4206ef688c6a560addc8095523c4f2a6cfe241ba4a2d08af9087f7f5ad` |
-| `ankiplusmcp-0fef80e.tgz` | 19763 | `30f261cf0d702613154572382fb12b6fd9bd45eee9d2b86c4ff4d1ec9a3c9409` |
+| `ankiplusmcp-0.3.0-py3-none-any.whl` | 367064 | `a87d15f05bf6bd4d9074a34bd56eda511153a3232f37577c36b9b6c32e5c48da` |
+| `ankiplusmcp-6e9bcf3.tgz` | 19763 | `30f261cf0d702613154572382fb12b6fd9bd45eee9d2b86c4ff4d1ec9a3c9409` |
+| `linux-main-smoke.py` | 1808 | `b11481440402fdd2852a466f44e1c5edca09ca23b3c562b51960c10483bc0615` |
 | `synthetic/diagram.png` | 5044 | `b40db6c05213978ab0ff7520ebd4298e3f7b13c3d1c1b8cf6b72a2bc27e82999` |
 | `synthetic/lecture.pdf` | 652502 | `d1d8144e262b7b31894667e94184db1a0399c01cb9c899504f8df876b4130bd6` |
 | `synthetic/textbook.md` | 126 | `9bc03ebeea742ed6265600534cfa81e69eaa0214a05b20d8f65a2c998e0d0281` |
@@ -59,7 +62,7 @@ fixture is implied by these files.
 1. **Identity and integrity, no collection access.** On the Mac, verify Darwin,
    both exact source revisions if using checkouts, and all transferred archive
    hashes. From the copied packet directory run `shasum -a 256 -c SHA256SUMS`.
-   Expected: all six artifacts match. Stop on any mismatch. Record paths/versions;
+   Expected: all listed files match. Stop on any mismatch. Record paths/versions;
    do not rebuild an archive and keep its old recorded hash.
 
 2. **Pinned registration preview.** With Node/uv available, extract the launcher
@@ -71,8 +74,8 @@ fixture is implied by these files.
    DATA="/absolute/chosen/AnkiPlus-acceptance-data"
    SOURCE="$PACKET/synthetic"
    LAUNCHER_TMP="$(mktemp -d)"
-   tar -xzf "$PACKET/ankiplusmcp-0fef80e.tgz" -C "$LAUNCHER_TMP"
-   export ANKIPLUSMCP_NPX_REF="$PACKET/ankiplusmcp-0fef80e.tgz"
+   tar -xzf "$PACKET/ankiplusmcp-6e9bcf3.tgz" -C "$LAUNCHER_TMP"
+   export ANKIPLUSMCP_NPX_REF="$PACKET/ankiplusmcp-6e9bcf3.tgz"
    export ANKIPLUSMCP_PY_SPEC="$PACKET/ankiplusmcp-0.3.0-py3-none-any.whl"
    node "$LAUNCHER_TMP/package/launcher/cli.mjs" init \
      --host claude-desktop --workspace-root "$DATA" --source-root "$SOURCE" --print
@@ -226,14 +229,98 @@ Linux ledgers, ignored evidence, Mac artifacts and working installed add-on.
 
 ## Linux verification and handoff
 
-Candidate0fef80e passed811public tests/25existing skips, check-mcp578/1,
-launcher44/44, frozen12, hooks42, golden66/14 identical, standard hardened smoke
-and both real-Anki package-name acceptances. A subsequent strict unsupported
-template-metadata fix passed32 focused tests; exact final revision revalidation
-and regenerated matching archives are pending. This interim packet is retained
-for traceability; do not accept candidate hashes as the later code.
+Final immutable runtime source is6e9bcf3 (full pin above), companion9fa3751.
+All final checks/builds started from the clean committed source. Runtime files
+remained unchanged until checks and both installed acceptances completed. Final
+handoff edits are documentation-only descendants; the wheel/image source pin
+remains the exact runtime revision above.
+
+| Verification | Result | Preserved raw evidence, relative to its repository |
+| --- | --- | --- |
+| Full primary public mode (`CARDS_PUBLIC_CI=1 .venv/bin/python -m pytest -q tests/mcp tests/unit tests/contract`) |818passed,25existing skips;395.45s | primary `.artifacts/6e9bcf3-public-suite.log` |
+| `CARDS_PUBLIC_CI=1 ./scripts/check-mcp.sh` |585passed,1existing skip;292.17s; all later checks passed | primary `.artifacts/6e9bcf3-check-mcp.log` |
+| Frozen hashes/hooks/CLI golden |12/12,42/42;66artifacts/14commands IDENTICAL | same check-mcp log; no golden/frozen changes |
+| Launcher `npm test` |44/44 | primary `.artifacts/6e9bcf3-launcher.log` |
+| Lock/version/privacy/whitespace | passed; uv resolved55locked packages | check-mcp plus final handoff checks |
+| Reviewer templates |8source templates unchanged from b0f4233; available frozen copies identical | `.artifacts/cb65c0c-template-consistency.json`; unchanged in6e9bcf3 |
+| Companion `.venv/bin/python -m pytest -q tests/unit` |891passed,0skips after final companion code | companion `.artifacts/student-production/material-fix-final-unit.log` |
+| Final material regressions |19passed; related coverage/coordinator/concurrency32passed after deterministic RED | primary `.artifacts/final-complete-bounds-focus.log`, `.artifacts/coverage-contention-{red,green}.log`; all included in final full checks |
+| Standard Docker image build and hardened smoke | passed; nonroot uid1000, actual OCR1region/render1sheet | primary `.artifacts/6e9bcf3-main-{build,smoke}.log`, smoke exit0 |
+| Installed primary+actual Anki/aqt26.9.2, textual `addon` | passed;9intent-before-send assertions,2mixed Basic/nativeIO notes, actual media/update/unsuspend, unknown-ack restart with no resend, OCR1region | `.artifacts/6e9bcf3-acceptance-textual.log`, exit0 |
+| Same installed path, numeric `124672614` | passed; same assertions and outcomes | `.artifacts/6e9bcf3-acceptance-numeric.log`, exit0 |
+| Installed source identity | both images' quality/coverage/coordinator/App hashes exactly match committed source | `.artifacts/6e9bcf3-{main,isolated}-source-hashes.json` |
+| Actual SDK UI/accessibility | source-linked edits/apply/reconnect/stale refusal/dirty protection, responsive/light/dark/focus/contrast tests pass in final suite | `tests/mcp/test_review_app.py`, source-image/session/protocol suites; `.artifacts/review-ui/` captures |
+
+These reviewer/host acceptance fixtures are explicitly signed **synthetic**
+fixtures. Their passing enforcement does not constitute actual independent card
+quality, real Mac host support or private-fixture acceptance. The25existing skips
+are retained, not waived. No release/platform claim is inferred from test counts.
+
+Final images (no publication):
+
+- `ankiplusmcp:6e9bcf3` = `sha256:3d608177de09a4077c1158282c41c5b8efa38ea85d1850b7315f541983d719f4`.
+- `ankiplus-student-isolated:6e9bcf3` = `sha256:4f76f1f26e0c7d0d50148dfa361b0796a62af2102abec683005f3a156d3ae2b7`.
+
+Labels identify6e9bcf3 and companion9fa3751. Image metadata, installed dependency
+freezes and rendered Compose are retained in `.artifacts/6e9bcf3-images.jsonl`,
+`6e9bcf3-{main,isolated}-pip-freeze.txt` and `6e9bcf3-*-compose*.json`.
+The standard Compose was **build only**. Its smoke used direct `docker run` with
+no mounts/network/ports, nonroot/read-only/cap-drop/no-new-privileges and
+1.5CPU/1536MiB/128PIDs. Combined acceptance used the inspected standalone
+`tests/isolated/compose.yaml`: no mounts/network/ports, nonroot/read-only,
+1.5CPU/2048MiB/192PIDs. No real Anki data, home directories, credentials or Mac configuration was
+mounted, no real companion contacted, and no unrelated service/data was changed.
+
+Reproduce the combined lane from the pinned checkouts using the explicit packaged
+archive input described in `tests/isolated/README.md`, then inspect rendered
+Compose before running:
+
+```sh
+ANKIPLUS_REVISION=6e9bcf3 COMPANION_REVISION=9fa3751 \
+  docker compose -f tests/isolated/compose.yaml config --format json
+ANKIPLUS_REVISION=6e9bcf3 COMPANION_REVISION=9fa3751 \
+  docker compose -f tests/isolated/compose.yaml build
+ANKIPLUS_REVISION=6e9bcf3 COMPANION_REVISION=9fa3751 \
+  docker compose -f tests/isolated/compose.yaml run --pull never --rm --no-deps acceptance
+ANKIPLUS_REVISION=6e9bcf3 COMPANION_REVISION=9fa3751 \
+  docker compose -f tests/isolated/compose.yaml run --pull never --rm --no-deps \
+    acceptance python /artifact/product_workflow.py 124672614
+```
+
+Implementation commits preserved on the existing primary branch:
+9bcc213 (durable proposals/authorization/application), e6c4c4d (production App and
+verified setup), d13cd5b (coverage/quality/recovery hardening), e4bd907 (connected
+acceptance/audit repair),7523cd0 (cited source/approval),0fef80e (material review
+fixes),121e219 (strict template metadata/trace),fc46cca (native phone containment),
+deb837e (public path privacy),cb65c0c (complete embedded/mask bounds),6e9bcf3
+(coverage retry race). Companionacdff93 binds media bytes;9fa3751 refuses CSS
+resource dependencies. No prior commit/evidence/ledger was removed.
+
+The single final fresh whole-branch engineering review covered the completed
+product at7523cd0/acdff93, found8material defects and was followed by one root-only
+RED/GREEN material fix pass, including the regression repairs above. No second
+engineering review was run. Separate impeccable UI finish review found3issues;
+all were fixed and scored resolved by the same UI reviewer. It is not prescribed
+Anki quality acceptance. Reports and declined-to-judge rulings are preserved in
+[final-production-review.md](final-production-review.md) and the existing
+`.superpowers/sdd/2026-11-19-production-integration/` ledger/evidence. Intermediate
+source/dirty builds remain diagnostics; only the final pins above describe this
+packet. Original student/compatibility ledgers and Mac evidence are retained.
+
+After the documentation-only handoff commit, fast-forward push/verify the two
+existing branches. No force push, history rewrite, merge, PR, package publication
+or deployment. The preserved ledger records the actual final remote-head check;
+operators should also compare `git rev-parse HEAD` / `git ls-remote` and verify
+that any primary descendant of the runtime pin changes handoff documents only.
+
+There is no remaining independently executable T3 subsystem assigned to a Mac
+blocker. Remaining gates are precisely steps8–12's real host cumulative reviewer
+controls/execution, Mac embedding/lifecycle/HTTP/Qt, private/production note-type
+and representative source-quality evaluation, novice acceptance and explicitly
+authorized synthetic collection operations. Windows/alternative-host acceptance
+and publishing/deployment remain outside this handoff.
 
 Implementation trace: [original requirement matrix](t3-requirement-evidence.md),
 [audit dispositions](audit-closure.md), [final review/fix pass](final-production-review.md),
 [connected workflow](student-workflow.md). Historical checkpoint/Mac action docs
-remain evidence and are explicitly superseded by this packet's ordered steps.
+remain evidence and are superseded by this packet's ordered steps.
