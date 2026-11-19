@@ -1,5 +1,7 @@
 # macOS host lifecycle evidence and launcher fixes
 
+Current status: **launcher lifecycle passed on the reported Mac at `d5c345f`**, without manual config edits. Evidence is user-reported; raw Mac artifacts have not been independently inspected on this development host. Earlier workaround-dependent observations below are retained as history.
+
 ## Report supplied from the real Mac
 
 The user reported the following at `94aa1c3` on `test/macos-compatibility`. These are real-host observations supplied in conversation; the development host has not independently read the Mac's artifact files.
@@ -42,3 +44,21 @@ The local stdio/Desktop connection and workaround-dependent lifecycle have evide
 `npm test`: **42 passed**, including all lifecycle regressions and a packed-archive execution through real offline `npx` with spaces/Unicode. Regression-first failures are retained in `red.log`, `adapters-red.log`, `migration-red.log` and `refs-red.log`; final results are in `npm.log` under `.artifacts/macos-launcher-fixes/`.
 
 `./scripts/check-mcp.sh`: **382 passed, 1 existing system-Chrome skip**, all 12 frozen contract hashes intact, wheel build, version/privacy guards, **42/42** host hook checks, and **IDENTICAL (66 files, 14 commands)** Linux golden. The Python engine/MCP source and frozen files are unchanged by these launcher fixes. No container rebuild was needed: the image does not include this Node launcher, and its Python implementation/dependencies are unchanged. No Mac revalidation is claimed for the new launcher until the lifecycle retest above runs.
+
+## Clean Mac lifecycle retest (user report, 2026-11-19)
+
+The dedicated `test/macos-compatibility` checkout fast-forwarded from `94aa1c3` to `d5c345f` and was clean. `npm test` passed **42/42** on the Mac. The fresh archive is `.artifacts/premacos/launcher-d5c345f-20261119-030234/ankiplusmcp-0.3.0.tgz`; its reported abbreviated SHA-256 is `8531956a…3418`. The unchanged Python implementation still uses `dist/ankiplusmcp-0.3.0-py3-none-any.whl`, reported abbreviated SHA-256 `22a4b4d9…9b74`. These abbreviated hashes are identification notes, not complete hashes independently verified here.
+
+Before changes, backups were saved under `.artifacts/premacos/host-backups/d5c345f-retest-20261119-030227/`.
+
+- Init dry run without force correctly refused the changed archive reference with exit 3; force dry run planned the replacement with exit 0.
+- `init --force --yes` exited 0 and populated both `ANKIPLUSMCP_PY_SPEC` and `ANKIPLUSMCP_UV` in the live entry and install receipt without hand editing.
+- Two complete Desktop restarts connected successfully and answered tools/list; the reported stdio listing contained 36 tools.
+- With Desktop quit, uninstall exited 0 and removed the owned entry and receipt. The unrelated Anki entry and top-level settings were identical to the pre-change backup.
+- Reinstall exited 0 with both runtime env values present in entry and receipt. A third Desktop restart connected and listed 36 tools. Desktop remains running with this registration.
+- A deliberately changed entry in a synthetic config under an isolated test home produced exit 3, preserving the entry and receipt. Restoring its recorded value and retrying produced exit 0 and removed the receipt. This negative test did not modify the real Desktop config.
+- No remote Git package fetch appeared in the Desktop logs. **Anki operations: 0. No blockers for this stage.**
+
+Raw evidence summary remains on the Mac at `.artifacts/premacos/launcher-d5c345f-20261119-030234/SUMMARY.md`. Five launcher backup files beside the real Desktop config were retained; no cleanup was requested or performed by the development host.
+
+This closes the reported launcher registration/restart/scoped-uninstall/reinstall stage. It supersedes the pending-retest status in the earlier local-fix checkpoint. It does not close embedded review UI, independent reviewer execution, companion operations/recovery, onboarding integration, the unrun full Mac suite, bundled-Chromium/Arabic-OCR checks, or private-quality acceptance.
