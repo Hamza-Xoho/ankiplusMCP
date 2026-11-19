@@ -77,7 +77,7 @@ class Sources:
                             self.store.path(workspace,'source-partial.json').unlink(missing_ok=True)
                 except (DomainError,OSError): pass
             try:
-                try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr', on_text_ready=text_ready)
+                try: extract.extract_source(path, self.store.path(workspace,prefix), slides, on_progress=progress, should_cancel=cancel, ocr_cache=self.store.root/'.cache'/'ocr', on_text_ready=text_ready, retain_image_evidence=True)
                 except extract.ExtractionCancelled as exc: raise DomainError('CANCELLED','Cancelled.') from exc
                 except Exception as exc:
                     # The extractor reports a missing OCR program as its own E24; name the fix instead.
@@ -95,6 +95,8 @@ class Sources:
         numbers = selection(slides,[s['n'] for s in data['slides']])
         text = slice_text(data,numbers)
         return {'text':text[offset:offset+limit], 'total_chars':len(text), 'slides':numbers,
+                'pages':[{'page':s['n'],'extraction_status':s.get('extraction_status','recognized')} for s in data['slides'] if s['n'] in numbers][:100],
+                'page_statuses_truncated':len(numbers)>100,
                 'next_offset':offset+limit if offset+limit<len(text) else None, **({'labels_pending':True} if pending else {})}
 
     def search_source(self, workspace, query, offset=0, limit=20):
@@ -141,9 +143,10 @@ class Sources:
             from cards.extract.ocr import extract
             if cancel(): raise DomainError('CANCELLED','Cancelled.')
             result = extract(self.store.path(workspace,artifact),min_conf=min_conf,min_len=min_len,group=group,pad=pad)
+            result['extraction_status']='recognized' if result['regions'] else 'no_text'
             name = f'ocr/{uuid.uuid4().hex}.json'; self.store.write_json(workspace,name,result)
             self.publisher.publish(ticket,cancel=cancel)
-            return {'_committed':True,'artifact':name, 'region_count':len(result['regions'])}
+            return {'_committed':True,'artifact':name, 'region_count':len(result['regions']), 'extraction_status':result['extraction_status']}
         return self.jobs.submit(workspace,'ocr_image',run)
 
     def build_occlusion(self, workspace, artifact, regions, mode='one', keep=None):

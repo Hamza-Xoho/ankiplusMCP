@@ -34,8 +34,13 @@ def _words(im, psm, min_conf, min_len, encoded=None):
             env={**os.environ, 'OMP_THREAD_LIMIT': '1'}, check=True)
     except (OSError, subprocess.SubprocessError) as exc:
         from ..common.errors import CardsError
-        raise CardsError('E24', 'OCR: field tesseract unavailable or failed',
-                         'install Tesseract with English data and retry extraction') from exc
+        status = ('unavailable' if isinstance(exc, FileNotFoundError) else
+                  'timeout' if isinstance(exc, subprocess.TimeoutExpired) else 'failed')
+        error = CardsError('E24', 'OCR: tesseract '+status,
+            'install Tesseract with English data' if status=='unavailable' else
+            'inspect the OCR process/runtime and retry; installation is not proven missing')
+        error.ocr_status = status
+        raise error from exc
     rows = list(csv.DictReader(io.StringIO(process.stdout.decode()), delimiter='\t'))
     d = {key: [row[key] for row in rows] for key in
          ('text','conf','left','top','width','height','block_num','par_num','line_num')}

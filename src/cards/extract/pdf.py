@@ -4,7 +4,7 @@ from .figures import export
 from .ocr import extract as labels
 from ..common.errors import CardsError
 
-def read(path, build, selected=None):
+def read(path, build, selected=None, *, retain_image_evidence=False):
     try:
         doc = fitz.open(path)
     except Exception as exc:
@@ -39,6 +39,7 @@ def read(path, build, selected=None):
             right = [l for l in rest if l[0][0]>=p.rect.width*.5]
             text = '\n'.join(l[1] for part in (top,left,right) for l in sorted(part,key=lambda l:(l[0][1],l[0][0])))
             flags = []
+            status = None
             figures = export(p, build)
             if not text.strip():
                 flags += ['image_only','scan']
@@ -48,10 +49,15 @@ def read(path, build, selected=None):
                 from PIL import Image
                 pix = p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
                 image = Image.frombytes('RGB',(pix.width,pix.height),pix.samples)
-                words = _words(_binarise(image),6,20,1)
+                try:
+                    words = _words(_binarise(image),6,20,1)
+                    status = 'recognized' if words else 'no_text'
+                except CardsError as exc:
+                    if not retain_image_evidence:raise
+                    status = getattr(exc,'ocr_status','failed');words=[]
                 text = '\n'.join(w['text'] for w in merge_line_words(words))
                 title = text.splitlines()[0] if text else ''
-                if not text:
-                    raise CardsError('E21',f'{path}: page {n} field text empty','supply a readable text layer or install Tesseract OCR')
+                if not text and not retain_image_evidence:
+                    raise CardsError('E21',f'{path}: page {n} field text empty','OCR completed without recognized text; inspect the page image or supply a readable text layer')
             yield {'n':n,'title':title,'text':text,'speaker_notes':'',
-                           'figures':figures,'flags':flags}
+                           'figures':figures,'flags':flags,**({'extraction_status':status} if retain_image_evidence and status else {})}

@@ -80,6 +80,7 @@ def test_missing_browser_is_a_dependency_error(monkeypatch):
 
 
 def test_doctor_and_setup_accept_system_chrome(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(doctor, 'probe_browser', lambda browser: None)
     monkeypatch.setattr(doctor, 'have', lambda name: name == 'tesseract')
     monkeypatch.setattr(doctor, 'system_chrome', lambda: '/x/chrome')
     check = next(c for c in doctor.run_checks(tmp_path) if c['name'] == 'chromium')

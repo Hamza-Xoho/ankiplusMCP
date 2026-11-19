@@ -146,3 +146,27 @@ screenshot allocation (390px wide, 12,000px height per side, 24 million aggregat
 pixels). Narrow or resize selections when refused; no silent sample replaces the
 complete selected review. Suspension requests are partitioned at staging so
 already-active cards are readback-unchanged, never counted as newly unsuspended.
+
+## OCR evidence and Desktop instructions
+
+OCR can complete successfully with zero regions. `no_text` means no text was
+recognized with the unchanged OCR settings; it does not mean Tesseract is absent.
+MCP source extraction retains image-only pages/crops and reports recognized,
+no_text, unavailable, failed or timeout status. Use get_page_image/get_image to
+inspect the evidence. Empty text cannot validate a quotation. Image evidence is
+not factual verification and never replaces required quality review. Legacy CLI
+extraction still refuses an empty text page, with honest advice.
+
+Claude Desktop connector registration does not install a Claude Code filesystem
+skill: Desktop has no supported skillDir in this launcher. In Desktop Project
+instructions, ask AnkiPlus to read `get_guidance(topic="workflow")` and follow it;
+the same versioned workflow is packaged in the server. Do not copy into an
+invented Desktop skill folder. Project instruction setup remains a manual host
+step, not a verified installation milestone.
+
+For a local wheel, set ANKIPLUSMCP_PY_SPEC to
+`ankiplusmcp[all] @ file:///absolute/path/to/ankiplusmcp-0.3.0-py3-none-any.whl`
+(use a correctly encoded file URI for spaces). A bare wheel installs only core
+requirements, omitting Playwright. Chrome alone cannot provide the Python driver.
+Doctor now actually imports/launches through Playwright; optional browser failure
+is reported missing, even when Chrome exists. It never downloads a browser.

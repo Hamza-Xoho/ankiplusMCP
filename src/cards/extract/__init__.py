@@ -50,7 +50,7 @@ class OcrFailure(Exception):
 
 def ocr_figures(paths: list[Path], *, workers: int | None = None, cache_dir: Path | None = None,
                 on_progress: Callable[[int, int], None] | None = None,
-                should_cancel: Callable[[], bool] | None = None) -> dict[Path, dict]:
+                should_cancel: Callable[[], bool] | None = None, retain_image_evidence=False) -> dict[Path, dict]:
     """OCR each distinct image once (by content) on a thread pool, largest first.
 
     Every path gets its own copy of its group's result. on_progress(done, total) counts figures and
@@ -79,6 +79,8 @@ def ocr_figures(paths: list[Path], *, workers: int | None = None, cache_dir: Pat
         try:
             return ocr.cached_extract(group[0], cache_dir)
         except Exception as exc:
+            if retain_image_evidence and getattr(exc,'code',None)=='E24':
+                return {'regions':[], 'repeated':{}, 'extraction_status':getattr(exc,'ocr_status','failed')}
             stop.set()
             raise OcrFailure(group[0]) from exc
     results: dict[Path, dict] = {}
@@ -124,7 +126,7 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
                    on_progress: Callable[[str, int, int | None], None] | None = None,
                    should_cancel: Callable[[], bool] | None = None,
                    workers: int | None = None, ocr_cache: Path | None = None,
-                   on_text_ready: Callable[[dict], None] | None = None) -> Extraction:
+                   on_text_ready: Callable[[dict], None] | None = None, retain_image_evidence=False) -> Extraction:
     """Extract `source` into `out_dir/source`; reads no build.json.
 
     on_progress('slides', done, None) follows each slide read; on_progress('figures', done, total)
@@ -145,13 +147,13 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
     cache = build.path('source/slides.json')
     if cache.is_file():
         old = read_json(cache)
-        if isinstance(old,dict) and (old.get('source_sha256'),old.get('selection'),old.get('cache_version')) == (digest,spec,CACHE_VERSION) and all(build.path('source/'+f['file']).is_file() for s in old['slides'] for f in s['figures']) and build.path('source/map.md').is_file() and build.path('source/objectives.json').is_file() and build.path('source/slides_summary.json').is_file():
+        if isinstance(old,dict) and (old.get('source_sha256'),old.get('selection'),old.get('cache_version')) == (digest,spec,CACHE_VERSION) and old.get('retain_image_evidence',False)==retain_image_evidence and all(build.path('source/'+f['file']).is_file() for s in old['slides'] for f in s['figures']) and build.path('source/map.md').is_file() and build.path('source/objectives.json').is_file() and build.path('source/slides_summary.json').is_file():
             return Extraction(old['slide_count'],0,0,0,False,True,build.path('source/map.md'))
     # Invalidate the manifest before replacing any associated figure crops.
     cache.unlink(missing_ok=True)
     if path.suffix.lower()=='.pdf':
         from . import pdf
-        slides = pdf.read(path,build,spec)
+        slides = pdf.read(path,build,spec,retain_image_evidence=True) if retain_image_evidence else pdf.read(path,build,spec)
     elif path.suffix.lower() in ('.txt','.md','.markdown'):
         slides = text_source.read(path)
         chosen = selection(spec,[s['n'] for s in slides])
@@ -179,6 +181,7 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
     lecture = f'{identity[1].upper()}-L{int(identity[2]):03d}' if identity else path.stem
     data = {'lecture':lecture,'slide_count':len(slides),'source_sha256':digest,
             'selection':spec,'cache_version':CACHE_VERSION,'slides':slides}
+    if retain_image_evidence:data['retain_image_evidence']=True
     for figure in figures.values():
         figure['ocr_labels'] = []
         figure['repeated_labels'] = []
@@ -189,11 +192,12 @@ def extract_source(source: Path, out_dir: Path, slides: str | None = None, *,
     try:
         found = ocr_figures(list(figures), workers=workers, cache_dir=ocr_cache,
                             on_progress=(lambda done, total: on_progress('figures',done,total)) if on_progress else None,
-                            should_cancel=should_cancel)
+                            should_cancel=should_cancel, **({"retain_image_evidence":True} if retain_image_evidence else {}))
     except OcrFailure as failure:
         figure = figures[failure.path]
         raise CardsError('E24',f"{path}: field {figure['fig_id']} OCR failed: {failure.__cause__}",'install Tesseract and retry extraction') from failure.__cause__
     for figure_path, figure in figures.items():
+        if retain_image_evidence:figure['extraction_status']=found[figure_path].get('extraction_status','recognized' if found[figure_path]['regions'] else 'no_text')
         figure['ocr_labels'] = found[figure_path]['regions']
         figure['repeated_labels'] = list(found[figure_path]['repeated'])
     figs = [f for s in slides for f in s['figures']]

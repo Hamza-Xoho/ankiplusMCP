@@ -251,10 +251,11 @@ class API:
         """Explicitly confirm a shown run-only choice and invalidate affected staged authorization."""
         return self._coordinator().confirm_run_preferences(run_id,change_id)
 
-    def get_guidance(self, topic: Literal['overview','quality','maintainer','student']='overview') -> dict:
+    def get_guidance(self, topic: Literal['overview','quality','maintainer','student','workflow']='overview') -> dict:
         """Read optional workflow examples or card/reviewer guidance. No prescribed tool sequence."""
         from cards.review.packets import TEMPLATES
         if topic=='overview': text=(Path(__file__).parent/'guidance'/'SKILL.md').read_text()
+        elif topic=='workflow': text=(Path(__file__).parent/'guidance'/'student-workflow.md').read_text()
         elif topic=='quality': text=(TEMPLATES/'house-style.md').read_text()
         else: text=(TEMPLATES/topic/'rubric.md').read_text()
         return {'topic':topic,'text':text[:24000],'optional':True}

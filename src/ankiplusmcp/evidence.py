@@ -29,6 +29,7 @@ class SourceEvidence(Model):
     start: int | None = None
     end: int | None = None
     extraction_origin: Literal['text', 'ocr']
+    extraction_status: str = 'recognized'
     labels_pending: bool = False
     source_accuracy_verified: Literal[False] = False
 
@@ -69,6 +70,6 @@ class EvidenceResolver:
             result.append(SourceEvidence(
                 source_hash=snapshot.source_hash, source_name=snapshot.source_name, page=ref.page,
                 page_label=snapshot.page_label(ref.page), location_kind=snapshot.location_kind, extraction=prefix,
-                title=page.get('title', '')[:500], quote=quote, start=start, end=end,
+                extraction_status=page.get('extraction_status','recognized'), title=page.get('title', '')[:500], quote=quote, start=start, end=end,
                 extraction_origin='ocr' if 'scan' in page.get('flags', []) else 'text', labels_pending=pending))
         return result

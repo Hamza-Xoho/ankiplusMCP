@@ -102,6 +102,15 @@ def _writable(path):
     return False
 
 
+def probe_browser(browser):
+    """Verify the actual Python driver and browser can launch; presence is insufficient."""
+    from playwright.sync_api import sync_playwright
+    from cards.render import launch_options
+    with sync_playwright() as playwright:
+        instance=playwright.chromium.launch(**launch_options(browser))
+        instance.close()
+
+
 def run_checks(workspace_root, browser_setting='auto', browser_error=None):
     """One record per prerequisite: name, status ok|missing, required, detail, fix.
     browser_error is why the configured browser setting could not be read; it fails the chromium check."""
@@ -126,6 +135,12 @@ def run_checks(workspace_root, browser_setting='auto', browser_error=None):
         add('chromium', False, False, browser_error, 'Correct the browser setting in the config file.')
     else:
         browser, detail = describe_browser(browser_setting)
+        if browser is not None:
+            try:
+                probe_browser(browser)
+            except Exception:
+                browser=None
+                detail='Browser detected but Playwright import/launch failed; install the render extra and verify browser runtime dependencies.'
         add('chromium', browser is not None, False, detail, FIXES['chromium'])
     return checks
 
