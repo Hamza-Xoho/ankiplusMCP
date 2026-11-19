@@ -87,3 +87,20 @@ Companion push was attempted with the configured GitHub credential and refused
 commits remain local pending repository write access; no authorization bypass,
 visibility change, fork or alternate repository was attempted. The same account
 has push:true on the primary repository.
+
+The post-fix AnkiPlus container build and smoke also passed, labelled
+4963722-dirty because the index fix was uncommitted when the build started (now
+committed as b41580c). The smoke uses a disposable no-network/no-mount container,
+non-root/read-only/cap-drop/no-new-privileges/resource limits; real Tesseract,
+Chromium and history-index migration/search pass. No project data volume is
+mounted. Build/image/smoke logs are retained in the ignored follow-up workspace.
+Canonical upstream fetches also confirmed no drift: AnkiPlus main b0f4233 and
+ankimcp/anki-mcp-server-addon main278f5e94c8eb5faedff272c505310e55c540b26f.
+
+This checkpoint does not complete original Tasks7–10 or14, the remaining audit
+register, private/representative quality or first-release acceptance. No Mac
+add-on install, profile switch, registration change, real-collection access,
+service deployment, fork, visibility change, package publication or PR occurred.
+The exact Mac host-support action is macos-staged-host-action.md. The implementer
+still owns the missing product work; the owner's necessary external actions do
+not substitute for that implementation.
