@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare disposable synthetic Desktop probes; never register hosts or connect Anki."""
+"""Prepare synthetic probes; never edit global host config or connect Anki."""
 import argparse
 import hashlib
 import json
@@ -178,10 +178,11 @@ def prepare(output: Path) -> dict:
     if lock.is_file():(output/'package-lock.json').write_bytes(lock.read_bytes())
     registration={'mcpServers':{'ankiplus-compat-probe':{'command':sys.executable,'args':[str(output/'probe_server.py'),'--data-root',str(output/'data')]}}}
     (output/'registration.json').write_text(json.dumps(registration,ensure_ascii=False,indent=2)+'\n')
+    (output/'.mcp.json').write_bytes((output/'registration.json').read_bytes())
     report={'schema_version':1,'root':str(output),'revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'performed_anki_operations':0,'desktop_compatibility':'not_run','reviewer_execution':'not_run','independent_reviewers':{'status':'not_run'},'companion':{'status':'not_run','operations':[],'mutation_authorization':'not_granted; separate explicit isolated-profile authorization required'}}
     report['source_dirty']=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip())
     report['generated_sha256']={name:hashlib.sha256((output/name).read_bytes()).hexdigest()
-        for name in ('probe_server.py','review.js','review.template.html','build.mjs','package.json','package-lock.json')}
+        for name in ('probe_server.py','review.js','review.template.html','build.mjs','package.json','package-lock.json','.mcp.json')}
     (output/'experiment.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
     template={'overall_status':'not_run','source':{'revision':report['revision'],'dirty':report['source_dirty']},
         'environment':{'macOS':None,'architecture':None,'desktop_app':None,'code_runtime':None,'subscription':None},

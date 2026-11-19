@@ -67,25 +67,37 @@ never turn missing evidence into a pass. Keep local-check output and screenshots
 
 ## Register the separate sample server
 
-`registration.json` contains only `mcpServers.ankiplus-compat-probe`, using the
-absolute venv Python and generated script/data paths. Back up Desktop's config
-and record hashes/settings before adding that one key. If the key already exists,
-preserve it and diagnose rather than overwrite it. Use the supported local MCP
-registration path for each surface. Do not assume Desktop Chat registration is
-automatically available in Code or Cowork; record how each actually connects.
+The generator writes both `registration.json` and an identical project-local
+`.mcp.json`, containing only `mcpServers.ankiplus-compat-probe`, using the absolute
+venv Python and generated script/data paths. The Code experiment uses that
+`.mcp.json` and the host's enablement prompt. It needs no global Desktop config
+edit. For an older prepared folder missing `.mcp.json`, create it from that
+folder's `registration.json` only if absent; preserve an existing file on mismatch.
 
-For a project-local Code registration, the generated experiment folder may hold
-a `.mcp.json` copied from `registration.json`. Open that folder as the local Code
-project for the reviewer stage so its `.claude/agents/` definitions are discovered.
+Open that exact folder in a new **Local Code** session with **Worktree off**, so
+the session uses the existing ignored fixtures. This also makes its project-local
+`.claude/agents/` definitions available for discovery during the reviewer stage.
 Keep repository `.claude/` files frozen. Project MCP enablement/restart prompts are
 normal host interactions for the owner to accept in the app.
+The agent checks actual discovery and resource access; the owner only performs
+necessary folder selection, enablement and interactive sample clicks. A separately
+launched stdio smoke does not establish that the host connected the probe.
 Confirm both aliases actually appear in the runtime's available agents. If project
 discovery or inherited hooks prevent loading them, save the exact error and mark
 that stage blocked; preserve the guards and report the loading limitation.
 
+For the separate Chat embedding experiment, back up Desktop's config and record
+hashes/settings before adding only the probe key from `registration.json`. Preserve
+an existing key and diagnose rather than overwrite it. Record how each surface
+actually connects; project-local Code registration does not prove Chat/Cowork access.
+
 Quit/reopen as needed and confirm the **probe** lists four tools and its single
 `ui://ankiplus-probe/review.html` resource. The working product remains a separate
 36-tool server; neither count proves the view rendered.
+The four-tool count is the raw MCP response. An Apps-aware host may hide
+`save_sample_decisions` from the model because it is app-only; the model-facing
+probe tools are `open_sample_review`, `read_sample_state` and
+`observe_content_channels`. Record filtering separately from connection failure.
 
 ## Actual embedded view: each surface separately
 

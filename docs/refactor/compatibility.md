@@ -67,3 +67,27 @@ that same version downloaded successfully in a separate bounded diagnostic and
 the unchanged build then passed. Both attempts are retained; no lock or runtime
 restriction was relaxed. The probe itself is a developer experiment, excluded
 from the production container/package.
+
+## Mac probe registration diagnosis
+
+The owner subsequently supplied a real Code-session report at `bfca2ab`:
+production `ankiplusmcp` was connected, but the separate probe was absent from
+tool discovery. Its folder contained `registration.json` without `.mcp.json`.
+A separate process listed four probe tools; its piped resource response was not
+confirmed. These observations do not establish host connection or embedded UI
+support. The reported Desktop version was read from earlier evidence, not
+remeasured in that session.
+
+The generator now supplies the missing project-local `.mcp.json` automatically,
+identical to the registration fragment, with the absolute venv command and paths.
+A new regression reproduced the missing file before the fix, and the stdio/resource
+test now uses the generated command/arguments. For an already-prepared Mac folder,
+the agent can create that file from its existing fragment if absent, then the owner
+starts a new Local Code session on that exact folder, with Worktree off, and accepts
+probe enablement. Global Desktop configuration remains a separate Chat-stage action.
+Actual probe discovery/resource access/embedding on the Mac are still pending.
+
+Registration-fix verification: ten focused tests passed; `check-mcp.sh` passed
+392 tests with its one existing skip, all frozen hashes/42 hooks, wheel/version/
+privacy checks and the unchanged 66-file/14-command CLI golden. No production
+module, launcher dependency or container build input changed in this fix.

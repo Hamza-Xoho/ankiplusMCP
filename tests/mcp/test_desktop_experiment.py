@@ -57,7 +57,8 @@ def test_probe_stdio_resource_ui_metadata_and_distinct_content_channels(tmp_path
     # A placeholder is enough for the protocol test; bundle/build is a separate real gate.
     (root/'review.html').write_text('<!doctype html><title>Synthetic probe</title>')
     async def run():
-        params=StdioServerParameters(command=sys.executable,args=[str(root/'probe_server.py'),'--data-root',str(root/'data')],env=dict(os.environ))
+        entry=json.loads((root/'.mcp.json').read_text())['mcpServers']['ankiplus-compat-probe']
+        params=StdioServerParameters(command=entry['command'],args=entry['args'],env=dict(os.environ))
         async with stdio_client(params) as (read,write):
             async with ClientSession(read,write) as session:
                 await session.initialize();listed=await session.list_tools();tools={t.name:t for t in listed.tools}
@@ -140,3 +141,13 @@ def test_reviewer_probe_cannot_claim_blind_recall_from_parallel_sheets(tmp_path)
     assert 'Cannot verify blind recall' in (root/'EXPECTATIONS.md').read_text()
     template=json.loads((root/'HOST-RESULTS.template.json').read_text())
     assert template['reviewers']['blind_recall']=='unverified_parallel_front_back_exposure'
+
+
+def test_preparation_includes_opt_in_project_mcp_registration(tmp_path):
+    root=Path(prepared(tmp_path)['root'])
+    project=json.loads((root/'.mcp.json').read_text())
+    assert (root/'.mcp.json').read_bytes()==(root/'registration.json').read_bytes()
+    assert set(project['mcpServers'])=={'ankiplus-compat-probe'}
+    entry=project['mcpServers']['ankiplus-compat-probe']
+    assert Path(entry['command']).is_absolute()
+    assert entry['args']==[str(root/'probe_server.py'),'--data-root',str(root/'data')]
