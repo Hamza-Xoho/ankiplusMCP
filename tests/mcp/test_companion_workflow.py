@@ -16,7 +16,7 @@ def test_collection_coverage_is_connected_to_product_api(tmp_path):
     c.handlers['notes_info']=lambda _: {'notes':[{'noteId':17,'cards':[23,24],
         'fields':{'Text':{'value':'{{c1::a}} {{c2::b}}'}}}]}
     c.handlers['conditional_student_operation']=lambda _: {}
-    c.handlers['student_operation_state']=lambda args: {'version':1,'operation':args['operation'],
+    c.handlers['student_operation_state']=lambda args: {'version':2,'media':{},'operation':args['operation'],
         'arguments':args['arguments'],'binding':{k:v for k,v in identity.items() if k!='identity_complete'},
         'target':[{'id':17,'fields':{'Text':'{{c1::a}} {{c2::b}}'},'cards':[{'id':23,'nid':17,'queue':-1},{'id':24,'nid':17,'queue':0}]}]}
     @asynccontextmanager
@@ -62,7 +62,7 @@ def test_coverage_refuses_mixed_note_and_card_snapshots(tmp_path, damage):
     c.handlers['find_notes']=lambda _: {'noteIds':[17],'hasMore':False}
     c.handlers['notes_info']=lambda _: {'notes':[{'noteId':17,'cards':[23], 'fields':{'Text':{'value':'before'}}}]}
     c.handlers['conditional_student_operation']=lambda _:{}
-    c.handlers['student_operation_state']=lambda args:dict(version=1,binding=binding,operation=args['operation'],arguments=args['arguments'],
+    c.handlers['student_operation_state']=lambda args:dict(version=2,media={},binding=binding,operation=args['operation'],arguments=args['arguments'],
         target=[{'id':17,'fields':{'Text':'after' if damage=='fields' else 'before'},'cards':
             [{'id':23,'nid':17,'queue':0}]+([{'id':24,'nid':17,'queue':0}] if damage=='siblings' else [])}])
     @asynccontextmanager

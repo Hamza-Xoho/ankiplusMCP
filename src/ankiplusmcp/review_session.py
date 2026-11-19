@@ -69,10 +69,13 @@ class ReviewSession:
                 for row in report:
                     if row.get('note_id')==d.get('draft_id') or (row['type']=='set' and d.get('draft_id') in row.get('notes',[])):
                         rows.append({k:(str(v)[:800] if not isinstance(v,(bool,int)) else v) for k,v in row.items() if k not in ('rewrite',)})
+            findings=[f for f in p.findings if f.get('card_id') in (None,d.get('draft_id'))]+rows
+            from .run_responses import page
+            shown,_=page(findings,0,10,budget=6000)
             items.append({**d,'fields':display,'truncated_fields':truncated,
                 'selected':inputs['review_selection'].get(d['concept_id'],True),'source_evidence':refs,
                 'existing_notes':existing,'more_existing_candidates':len(d['candidate_note_ids'])>3,
-                'findings':[f for f in p.findings if f.get('card_id') in (None,d.get('draft_id'))]+rows})
+                'findings':shown,'findings_total':len(findings),'more_findings':len(shown)<len(findings)})
         return {'run_id':run_id,'workspace':run.workspace,'session_token':session_token,'digest':version,
             'proposal_digest':p.digest,'content_digest':p.content_digest,'items':items,'offset':offset,'total':len(inputs['decisions']),
             'next_offset':offset+1 if offset+1<len(inputs['decisions']) else None,'needs_revalidation':not current,
@@ -94,7 +97,7 @@ class ReviewSession:
         return {'text':value[offset:offset+limit],'next_offset':offset+limit if offset+limit<len(value) else None,'digest':version}
 
     async def decide(self,run_id,session_token,expected_proposal_digest,decisions):
-        with self.c.lock(run_id):
+        with self.c.lock(run_id),self.c.collection_lock(self.c._latest(run_id).binding):
             run=self._validate_session(run_id,session_token)
             p,inputs,version,current=self._view(run_id)
             if expected_proposal_digest!=version:raise DomainError('STALE','This tab shows an older proposal. Reload the saved review before changing it.')
@@ -103,7 +106,7 @@ class ReviewSession:
                 raise DomainError('REVIEW','Each decision and its fields must be structured mappings.')
             if len({v.get('concept_id') for v in decisions})!=len(decisions):raise DomainError('REVIEW','Do not repeat a review item in one save.')
             by_id={d['concept_id']:d for d in inputs['decisions']};cards={c['id']:c for c in inputs['cards']}
-            selected=dict(inputs['review_selection']);changed=[];card_changed=False
+            selected=dict(inputs['review_selection']);changed=[];card_changed=False;resolved=[]
             notes={n['note_id']:n for b in inputs['coverage'] for n in b['notes']}
             revision=self.c.s.store.get(run.workspace)['revision']
             for value in decisions:
@@ -140,9 +143,12 @@ class ReviewSession:
                     d.update(chosen_note_ids=[nid],card_ids=suspended or ids,disposition='propose_unsuspend' if suspended else 'already_covered',uncertain=False)
                 if d['source_disagreement'] and not (value.get('resolve_contradiction') is True and action in ('choose-existing','edit-new','explicit-update')):
                     d['disposition']='pending'
-                elif value.get('resolve_contradiction') is True:d['source_disagreement']=False
+                elif value.get('resolve_contradiction') is True:
+                    d['source_disagreement']=False
+                    resolved.extend(inputs['pending_conflicts'].get(ident,[]))
                 changed.append(CoverageDecision.model_validate(d).model_dump())
             if card_changed:self.c.s.save_cards(run.workspace,list(cards.values()),revision)
+            if resolved:self.c.event(run_id,'source_contradiction_resolved',{'tokens':sorted(set(resolved))})
             self.c.event(run_id,'review_decision',{'decisions':changed,'selected':selected,'previous_digest':version})
         try:await self.c.stage(run_id)
         except DomainError as exc:

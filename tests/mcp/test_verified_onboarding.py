@@ -91,7 +91,7 @@ def setup_ready(workflow):
     from ankiplusmcp.review_app import html
     from ankiplusmcp.runs import _encoded
     c,s,e,r,d=workflow;o=Onboarding(s)
-    run(o.advance('storage',{}));run(o.advance('connection',{}))
+    run(o.advance('preferences',{}));run(o.advance('storage',{}));run(o.advance('connection',{}))
     run(o.advance('quality_runtime',{'run_id':r.id}))
     page=run(ReviewSession(c).open(r.id))
     receipt={'run_id':r.id,'session_token_sha256':hashlib.sha256(page['session_token'].encode()).hexdigest(),
@@ -102,3 +102,46 @@ def setup_ready(workflow):
     run(o.advance('interactive_review',receipt));result=run(o.advance('guide',{}))
     assert result.onboarding_complete, result.model_dump()
     return result
+
+
+def test_confirmed_preference_replay_survives_verified_health_progress(workflow):
+    from ankiplusmcp.server import API
+    from ankiplusmcp.onboarding import Onboarding
+    c,s,e,r,d=workflow;api=API(s)
+    cfg=c.config.read();change=api.propose_preferences({'source_materials':['custom notes']},cfg.config_version)
+    api.confirm_preferences(change['id']);run(Onboarding(s).advance('storage',{}))
+    saved=api.confirm_preferences(change['id'])
+    assert saved['configuration']['source_materials']==['custom notes']
+
+
+def test_setup_cannot_complete_without_explicitly_confirmed_interview_choices(tmp_path):
+    from ankiplusmcp.service import Service
+    from ankiplusmcp.onboarding import Onboarding
+    s=Service(tmp_path/'fresh',[tmp_path])
+    try:
+        status=Onboarding(s).status()
+        assert 'preferences' in status.remaining_checks
+        proposal=Onboarding(s).propose_choices({})
+        assert proposal['scope']=='future_preferences'
+        from ankiplusmcp.server import API
+        result=API(s).confirm_preferences(proposal['id'])
+        assert 'preferences' not in result['remaining_checks']
+        assert not result['configuration']['onboarding_complete']
+    finally:s.close()
+
+
+def test_setup_can_inspect_own_decks_without_requiring_a_premade_deck(workflow):
+    from types import SimpleNamespace
+    from ankiplusmcp.server import API
+    c,s,e,r,d=workflow;original=e.list_tools;call=e.call_tool
+    async def tools():
+        value=await original();value.tools.append(SimpleNamespace(name='list_decks'));return value
+    async def response(name,args):
+        if name=='list_decks':return SimpleNamespace(isError=False,structuredContent={'decks':[{'deck_id':1,'name':'My Lecture','is_filtered':False},{'deck_id':2,'name':'Filtered','is_filtered':True}],'total':2})
+        return await call(name,args)
+    e.list_tools=tools;e.call_tool=response
+    result=run(API(s).get_collection_choices())
+    assert result['decks'][0]['name']=='My Lecture'
+    assert result['decks'][0]['eligible_for_scope'] is True
+    assert result['decks'][1]['eligible_for_scope'] is False
+    assert not e.sent

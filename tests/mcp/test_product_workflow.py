@@ -35,13 +35,13 @@ def install_media_transport(e):
         if op!='store_media_file':return original_state(op,args)
         data=e.media.get(args['filename'])
         target=None if data is None else {'filename':args['filename'],'size':len(data),'sha256':hashlib.sha256(data).hexdigest()}
-        return dict(version=1,operation=op,arguments=deepcopy(args),binding=deepcopy(e.binding),target=target)
+        return dict(version=2,media={},operation=op,arguments=deepcopy(args),binding=deepcopy(e.binding),target=target)
     async def call(name,args):
         from types import SimpleNamespace
         if name=='conditional_student_operation' and args['operation']=='store_media_file':
             a=args['arguments'];assert args['expected_state']==state('store_media_file',a)
             e.sent.append(('store_media_file',deepcopy(a)));e.media[a['filename']]=base64.b64decode(a['data'])
-            value={'version':1,'binding':e.binding,'result':{'filename':a['filename'],'size':len(e.media[a['filename']])}}
+            value={'version':2,'media':{},'binding':e.binding,'result':{'filename':a['filename'],'size':len(e.media[a['filename']])}}
         elif name=='read_media_file':
             data=e.media[args['filename']]
             value={'filename':args['filename'],'data':base64.b64encode(data).decode(),'size':len(data),'sha256':hashlib.sha256(data).hexdigest()}
@@ -73,3 +73,42 @@ def test_changed_media_invalidates_exact_authorization(workflow):
     Image.new('RGB',(24,24),'black').save(s.store.path(r.workspace,artifact))
     with pytest.raises(DomainError,match='STALE'):run(c.apply(r.id,p.digest))
     assert not e.sent
+
+
+def test_note_precondition_binds_uploaded_bytes_not_their_original_absence(workflow):
+    c,s,e,r,d=workflow;artifact=with_media(workflow);p=approved(workflow)
+    note=next(o for o in p.operations if o['operation']=='add_note')
+    assert note['expected_state']['media']['review.png']['sha256']==hashlib.sha256(s.store.path(r.workspace,artifact).read_bytes()).hexdigest()
+    assert all(v['status']=='confirmed' for v in run(c.apply(r.id,p.digest))['results'])
+
+
+def test_media_change_after_upload_cannot_create_a_note_with_unreviewed_bytes(workflow):
+    c,s,e,r,d=workflow;with_media(workflow);p=approved(workflow)
+    def change(op,args):
+        if op=='add_note':e.media['review.png']=b'foreign bytes'
+    e.before_send=change
+    result=run(c.apply(r.id,p.digest))
+    assert not e.notes
+    assert any(v['status'] in ('conflict','uncertain') for v in result['results'])
+
+
+@pytest.mark.parametrize('damage',['tags','model','deck','media','ack_binding','ack_version'])
+def test_complete_readback_refuses_wrong_model_tags_deck_media_or_ack(workflow,damage):
+    c,s,e,r,d=workflow
+    if damage=='media':with_media(workflow)
+    p=approved(workflow);original=e.call_tool
+    async def call(name,args):
+        response=await original(name,args)
+        if name=='conditional_student_operation' and args['operation']=='add_note':
+            if damage=='tags':e.notes[101]['tags']=[]
+            elif damage=='model':e.model['name']='Foreign model'
+            elif damage=='deck':e.cards[201]['did']=999
+            elif damage=='media':e.media['review.png']=b'changed after acceptance'
+            elif damage=='ack_binding':response.structuredContent['binding']['collection_session']='foreign'
+            elif damage=='ack_version':response.structuredContent['version']=999
+        return response
+    e.call_tool=call
+    result=run(c.apply(r.id,p.digest))
+    note=next(v for v in result['results'] if v['operation']=='add_note')
+    assert note['status']=='uncertain'
+    assert result['counts']['notes_created']==0

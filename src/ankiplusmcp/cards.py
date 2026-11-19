@@ -20,8 +20,9 @@ class Cards:
     def save_cards(self, workspace, cards, expected_revision):
         if not 1 <= len(cards) <= 500: raise DomainError('LIMIT','Save between 1 and 500 cards.')
         parsed = [Card.model_validate(c).model_dump() for c in cards]
+        default_type=self.profile.note_type if any(c['notetype'] is None for c in parsed) else None
         for card in parsed:
-            if card['notetype'] is None: card['notetype'] = self.profile.note_type
+            if card['notetype'] is None: card['notetype'] = default_type
         if len({c['id'] for c in parsed}) != len(parsed): raise DomainError('CARD','Duplicate card IDs.')
         with self.store.edit(workspace,expected_revision) as state:
             for card in parsed:
@@ -89,6 +90,7 @@ class Cards:
         snapshot = self.source_catalog.snapshot_locked(workspace)
         available = snapshot.available_pages()
         findings=[]
+        tag_root=self.profile.tag_root if house_style else None
         for card in cards:
             Card.model_validate(card)
             def finding(code,message,severity='blocker'):
@@ -103,7 +105,7 @@ class Cards:
                 for message in io_errors(card['fields']):
                     finding('IO',message)
             if house_style:
-                findings.extend(dict(f,card_id=card['id']) for f in lint(card,tag_root=self.profile.tag_root))
+                findings.extend(dict(f,card_id=card['id']) for f in lint(card,tag_root=tag_root))
         coverage_result=None
         if coverage:
             from cards.check.coverage import summarize

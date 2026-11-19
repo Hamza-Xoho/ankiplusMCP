@@ -62,3 +62,31 @@ def test_malformed_review_decisions_are_bounded_domain_errors(workflow,decisions
     c,s,e,r,d=workflow;sessions,page=opened(workflow)
     with pytest.raises(DomainError):run(sessions.decide(r.id,page['session_token'],page['digest'],decisions))
     assert not e.sent
+
+
+def test_excluded_draft_technical_findings_do_not_block_unrelated_selected_cards(workflow):
+    c,s,e,r,d=workflow
+    cards=s.get_cards(r.workspace)['cards']
+    s.save_cards(r.workspace,[*cards,dict(id='bad',kind='cloze',notetype='Basic',fields={'Front':'No cloze here','Back':'Invalid draft'},tags=['#AnkiPlus::Synthetic'],source_ref=[1])],1)
+    covered(workflow)
+    other={**d,'concept_id':'bad','draft_id':'bad'}
+    run(c.coverage(r.id,'collagen',[other]))
+    from ankiplusmcp.review_session import ReviewSession
+    run(c.stage(r.id));sessions=ReviewSession(c);page=run(sessions.open(r.id))
+    run(sessions.decide(r.id,page['session_token'],page['digest'],[{'concept_id':'bad','action':'exclude'}]))
+    p=c._latest(r.id)
+    assert len(p.operations)==1 and p.operations[0]['draft_id']=='fibroblast'
+    assert not any(f.get('severity')=='blocker' for f in p.findings)
+
+
+def test_source_contradiction_can_only_close_through_explicit_bound_resolution(workflow):
+    c,s,e,r,d=workflow;d['source_disagreement']=True
+    sessions,page=opened(workflow)
+    still=run(sessions.decide(r.id,page['session_token'],page['digest'],[{'concept_id':'fibroblast','action':'keep','resolve_contradiction':True}]))
+    assert c._latest(r.id).decisions[0]['disposition']=='pending'
+    resolved=run(sessions.decide(r.id,still['session_token'],still['digest'],[{'concept_id':'fibroblast','action':'edit-new','fields':{'Back':'Fibroblasts'},'resolve_contradiction':True}]))
+    assert c._latest(r.id).decisions[0]['disposition']=='propose_create'
+    assert any(e.kind=='source_contradiction_resolved' for e in c.runs.read(r.id).events)
+    second=c.start(r.workspace,[1]);d['source_disagreement']=False;run(c.coverage(second.id,'collagen',[d]))
+    assert run(c.stage(second.id)).decisions[0]['disposition']=='propose_create'
+    assert not e.sent

@@ -30,7 +30,13 @@ class SyntheticCompanion:
         elif op=='update_note_fields':target=self.note(args['id'])
         elif op in ('card_suspend','card_unsuspend'):target=[self.note(n) for n in sorted({self.cards[c]['nid'] for c in args['card_ids']})]
         else: target=None
-        return dict(version=1,operation=op,arguments=deepcopy(args),binding=deepcopy(self.binding),target=target)
+        import re
+        from urllib.parse import unquote
+        texts=list(args.get('fields',{}).values())
+        for note in (target if isinstance(target,list) else [target] if op=='update_note_fields' else []):texts.extend(note['fields'].values())
+        names={unquote(name) for text in texts for name in re.findall(r'src=[\"\']([^\"\']+)',text)}
+        media={name:({'filename':name,'size':len(self.media[name]),'sha256':hashlib.sha256(self.media[name]).hexdigest()} if name in self.media else None) for name in names}
+        return dict(version=2,media=media,operation=op,arguments=deepcopy(args),binding=deepcopy(self.binding),target=target)
     async def call_tool(self,name,args):
         if name=='model_field_names':value={'model_name':'Basic','field_names':['Front','Back']}
         elif name=='model_templates':value={'model_name':'Basic','templates':{'Card 1':{'Front':'{{Front}}','Back':'{{Back}}'}}}
@@ -56,7 +62,7 @@ class SyntheticCompanion:
                 result={'card_ids':a['card_ids']}
             else: raise AssertionError(op)
             if self.drop:raise TimeoutError('synthetic lost acknowledgement')
-            value={'version':1,'binding':deepcopy(self.binding),'result':result}
+            value={'version':2,'media':{},'binding':deepcopy(self.binding),'result':result}
         else:raise AssertionError(name)
         return SimpleNamespace(isError=False,structuredContent=value)
 
@@ -165,3 +171,53 @@ def test_modified_proposal_record_cannot_reuse_its_old_digest(workflow):
     path.write_text(json.dumps(value))
     with pytest.raises(DomainError,match='RUN_CORRUPT'):c.authorize(r.id,p.digest,'user')
     assert not e.sent
+
+
+def test_escaped_query_syntax_cannot_hide_scope_delimiters(workflow):
+    c,s,e,r,d=workflow
+    with pytest.raises(DomainError,match='SCOPE'):run(c.coverage(r.id,r'collagen\) or deck:*',[d]))
+    assert not e.queries
+
+
+def test_pending_source_contradiction_survives_a_later_unflagged_search(workflow):
+    c,s,e,r,d=workflow;d['source_disagreement']=True;covered(workflow)
+    d['source_disagreement']=False;covered(workflow)
+    assert run(c.stage(r.id)).decisions[0]['disposition']=='pending'
+
+
+def test_pending_source_contradiction_survives_into_a_new_run(workflow):
+    c,s,e,r,d=workflow;d['source_disagreement']=True;covered(workflow)
+    second=c.start(r.workspace,[1]);d['source_disagreement']=False
+    run(c.coverage(second.id,'collagen',[d]))
+    assert run(c.stage(second.id)).decisions[0]['disposition']=='pending'
+
+
+def test_verified_mapping_failure_stays_pending_under_automatic_create_policy(workflow):
+    c,s,e,r,d=workflow
+    config=c.config.read();c.config.confirm(c.config.propose({'review_mode':'automatic','uncertain_match':'create'},config.config_version).id)
+    from ankiplusmcp.evidence import EvidenceRef
+    d['source_refs']=[EvidenceRef.model_validate(ref).model_dump() for ref in d['source_refs']]
+    c.event(r.id,'verified_mapping',{'binding':e.binding,'concept_id':d['concept_id'],'source_refs':d['source_refs'],'fields':s._cards(r.workspace)[0]['fields'],'note_ids':[999],'card_ids':[1999],'tier':1})
+    covered(workflow)
+    p=run(c.stage(r.id))
+    assert p.decisions[0]['disposition']=='pending'
+    assert not p.operations
+
+
+def test_changed_approved_scope_requires_fresh_coverage_before_staging(workflow):
+    c,s,e,r,d=workflow;covered(workflow)
+    config=c.config.read();c.config.confirm(c.config.propose({'selected_decks':['Different']},config.config_version).id)
+    with pytest.raises(DomainError,match='SCOPE'):run(c.stage(r.id))
+
+
+def test_new_coverage_replaces_older_review_target_decision(workflow):
+    from ankiplusmcp.review_session import ReviewSession
+    c,s,e,r,d=workflow;existing(workflow)
+    sessions=ReviewSession(c);opened=run(sessions.open(r.id))
+    run(sessions.decide(r.id,opened['session_token'],opened['digest'],[{'concept_id':'fibroblast','action':'choose-existing','note_id':101,'card_ids':[201]}]))
+    e.notes.clear();e.cards.clear()
+    d.update(disposition='propose_create',candidate_note_ids=[],chosen_note_ids=[],card_ids=[])
+    covered(workflow)
+    p=run(c.stage(r.id))
+    assert p.decisions[0]['disposition']=='propose_create'
+    assert p.operations[0]['operation']=='add_note'

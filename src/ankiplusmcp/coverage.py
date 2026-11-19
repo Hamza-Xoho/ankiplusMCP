@@ -51,6 +51,7 @@ class CoverageDecision(Model):
     chosen_note_ids: list[Positive] = Field(default_factory=list, max_length=500)
     card_ids: list[Positive] = Field(default_factory=list, max_length=500)
     source_refs: list[EvidenceRef] = Field(default_factory=list, max_length=20)
+    pending_reason: Literal['prior_mapping_changed'] | None = None
     uncertain: bool = False
     source_disagreement: bool = False
 
@@ -59,7 +60,7 @@ class CoverageStore:
     def __init__(self, runs: RunStore, config: ConfigStore, evidence: EvidenceResolver):
         self.runs, self.config, self.evidence = runs, config, evidence
 
-    def record(self, run_id: str, snapshot: CollectionSnapshot, decisions: list[CoverageDecision], *, batch_id: str | None = None) -> list[CoverageDecision]:
+    def record(self, run_id: str, snapshot: CollectionSnapshot, decisions: list[CoverageDecision], *, batch_id: str | None = None, preferences=None) -> list[CoverageDecision]:
         batch_id=uuid4().hex if batch_id is None else batch_id
         if not isinstance(batch_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}',batch_id):
             raise DomainError('COVERAGE','Invalid coverage batch identifier.')
@@ -67,6 +68,7 @@ class CoverageStore:
         supplied=[CoverageDecision.model_validate(d).model_copy(deep=True) for d in decisions]
         if not 1<=len(supplied)<=100: raise DomainError('LIMIT','Record between 1 and 100 coverage decisions.')
         request={'run_id':run_id,'snapshot':snapshot.model_dump(),'decisions':[d.model_dump() for d in supplied]}
+        if preferences is not None:request['preferences']=preferences.model_dump()
         request_digest=hashlib.sha256(json.dumps(request,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode()).hexdigest()
         event_id='coverage-'+batch_id
         def existing(run):
@@ -83,7 +85,7 @@ class CoverageStore:
             raise DomainError('CONFIG', 'Historical run has unknown preferences; start a configured run before making new decisions.')
         # The initial run version is history; explicitly saved preferences govern
         # later decisions, while each event retains the version actually used.
-        config = self.config.read()
+        config = preferences if preferences is not None else self.config.read()
         snapshot = CollectionSnapshot.model_validate(snapshot)
         parsed = supplied
         if not 1 <= len(parsed) <= 100:
@@ -107,7 +109,7 @@ class CoverageStore:
                        (run.selection.pages and ref.page not in run.selection.pages) for ref in decision.source_refs):
                     raise DomainError('SOURCE_REF', 'Coverage falls outside the selected source version or chapter.')
             evidence = self.evidence.resolve(run.workspace, decision.source_refs) if decision.source_refs else []
-            if decision.source_disagreement:
+            if decision.source_disagreement or decision.pending_reason:
                 decision.disposition = 'pending'
             elif decision.uncertain:
                 if config.review_mode == 'manual' or config.uncertain_match == 'pending':

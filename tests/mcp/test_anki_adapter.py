@@ -76,8 +76,8 @@ def test_arbitrary_dispatch_is_impossible(adapter):
 def test_explicit_suspension_uses_captured_state(adapter):
     a,c=adapter
     binding=run(a.collection_identity())
-    state={'version':1,'operation':'card_suspend','arguments':{'card_ids':[23]},'binding':binding,'target':[]}
-    c.handlers['conditional_student_operation']=lambda args: {'version':1,'binding':binding,'result':{'suspended_count':1}}
+    state={'version':2,'media':{},'operation':'card_suspend','arguments':{'card_ids':[23]},'binding':binding,'target':[]}
+    c.handlers['conditional_student_operation']=lambda args: {'version':2,'media':{},'binding':binding,'result':{'suspended_count':1}}
     result=run(a.set_suspended([23],True,expected_state=state))
     assert result['result']['suspended_count']==1
     assert c.calls[-1][1]['expected_state']==state
@@ -89,7 +89,7 @@ def test_update_rejects_incomplete_fields_against_captured_model(adapter):
     args={'id':17,'fields':{'Front':'new'}}
     target={'fields':{'Front':'old','Back':'answer'},'model':{'name':'Basic','flds':[{'name':'Front'},{'name':'Back'}],
         'tmpls':[{'qfmt':'{{Front}}','afmt':'{{FrontSide}} {{Back}}'}],'css':''}}
-    state={'version':1,'operation':'update_note_fields','arguments':args,'binding':binding,'target':target}
+    state={'version':2,'media':{},'operation':'update_note_fields','arguments':args,'binding':binding,'target':target}
     with pytest.raises(DomainError,match='Complete'):
         run(a.update_note({'arguments':args,'expected_state':state}))
 
@@ -102,10 +102,10 @@ def test_create_batch_keeps_acknowledged_items_on_later_failure(adapter):
     envelopes=[]
     for front in ('one','two'):
         args={'deck_name':'Default','model_name':'Basic','fields':{'Front':front,'Back':'answer'},'tags':[]}
-        envelopes.append({'arguments':args,'expected_state':{'version':1,'operation':'add_note','arguments':args,'binding':binding,'target':{'model':model,'deck':{'id':1,'name':'Default'}}}})
+        envelopes.append({'arguments':args,'expected_state':{'version':2,'media':{},'operation':'add_note','arguments':args,'binding':binding,'target':{'model':model,'deck':{'id':1,'name':'Default'}}}})
     def write(args):
         if args['arguments']['fields']['Front']=='two': raise TimeoutError('private detail')
-        return {'version':1,'binding':binding,'result':{'note_id':17}}
+        return {'version':2,'media':{},'binding':binding,'result':{'note_id':17}}
     c.handlers['conditional_student_operation']=write
     results=run(a.create_notes(envelopes))
     assert [r['status'] for r in results]==['acknowledged','uncertain']
@@ -137,15 +137,33 @@ def test_malformed_create_acknowledgement_stops_batch(adapter, bad_result):
     batch=[]
     for front in ('valid','damaged','must not send'):
         args={'deck_name':'Default','model_name':'Basic','fields':{'Front':front,'Back':'answer'},'tags':[]}
-        batch.append({'arguments':args,'expected_state':{'version':1,'operation':'add_note','arguments':args,'binding':binding,'target':{'model':model,'deck':{'id':1,'name':'Default'}}}})
+        batch.append({'arguments':args,'expected_state':{'version':2,'media':{},'operation':'add_note','arguments':args,'binding':binding,'target':{'model':model,'deck':{'id':1,'name':'Default'}}}})
     sent=[]
     def write(args):
         front=args['arguments']['fields']['Front']
         sent.append(front)
-        return {'version':1,'binding':binding,'result':{'note_id':17} if front=='valid' else bad_result}
+        return {'version':2,'media':{},'binding':binding,'result':{'note_id':17} if front=='valid' else bad_result}
     c.handlers['conditional_student_operation']=write
     results=run(a.create_notes(batch))
     assert [r['status'] for r in results]==['acknowledged','uncertain']
     assert results[0]['acknowledgement']['result']['note_id']==17
     assert results[1]['code']=='PROTOCOL'
     assert sent==['valid','damaged']
+
+
+def test_old_guard_without_media_dependencies_cannot_stage_writes(adapter):
+    a,c=adapter;binding=run(a.collection_identity())
+    c.handlers['conditional_student_operation']=lambda _:{}
+    c.handlers['student_operation_state']=lambda args:{'version':1,'operation':args['operation'],'arguments':args['arguments'],'binding':binding,'target':[]}
+    with pytest.raises(DomainError):run(a.operation_state('card_unsuspend',{'card_ids':[23]}))
+
+
+@pytest.mark.parametrize('code,want',[('conflict','CONFLICT'),('uncertain','UNCERTAIN')])
+def test_guard_rejection_preserves_fixed_error_code_without_raw_details(adapter,code,want):
+    a,c=adapter
+    async def error(name,args):
+        return SimpleNamespace(isError=True,structuredContent=None,content=[SimpleNamespace(type='text',text=f'Error executing tool conditional_student_operation: [{code}] synthetic-private-detail')])
+    c.handlers['conditional_student_operation']=lambda _:{}
+    c.call_tool=error
+    with pytest.raises(DomainError,match=want) as caught:run(a._call('conditional_student_operation',{}))
+    assert 'synthetic-private-detail' not in str(caught.value)

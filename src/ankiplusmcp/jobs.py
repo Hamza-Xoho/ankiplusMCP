@@ -1,5 +1,6 @@
 """Persistent, cancellable jobs; owner leases distinguish restart from concurrency."""
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor,wait
+from threading import RLock
 import re
 import uuid
 from filelock import FileLock, Timeout
@@ -11,18 +12,24 @@ class Jobs:
         self.store = store
         self.owner = uuid.uuid4().hex
         self.lease_path = store.root/f'.owner-{self.owner}.lock'
-        self.lease = FileLock(self.lease_path)
+        self.lease = FileLock(self.lease_path,thread_local=False)
         self.lease.acquire()
         self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix='ankiplus')
+        self._guard=RLock();self._futures={};self._closing=False;self._shutdown_published=False
 
     def submit(self, workspace, operation, callback):
-        ident = uuid.uuid4().hex
-        now=utc_now()
-        record = {'id':ident,'owner':self.owner,'operation':operation,'status':'queued','progress':'queued','cancel_requested':False,
-                  'created':now,'updated':now}
-        self.store.write_json(workspace, f'jobs/{ident}.json', record)
-        self.pool.submit(self._run, workspace, ident, callback)
-        return record
+        with self._guard:
+            if self._closing:raise DomainError('BUSY','Job worker is closing; reopen AnkiPlus before starting work.')
+            ident = uuid.uuid4().hex
+            now=utc_now()
+            record = {'id':ident,'owner':self.owner,'operation':operation,'status':'queued','progress':'queued','cancel_requested':False,
+                      'created':now,'updated':now}
+            self.store.write_json(workspace, f'jobs/{ident}.json', record)
+
+            future=self.pool.submit(self._run,workspace,ident,callback)
+            self._futures[future]=(workspace,ident)
+            future.add_done_callback(lambda _:self._release_owner())
+            return record
 
     def _update(self, workspace, ident, **changes):
         with self.store.lock(workspace, 'jobs'):
@@ -106,7 +113,25 @@ class Jobs:
             result.update(errors=errors[offset:offset+limit], error_total=len(errors))
         return result
 
-    def close(self):
-        self.pool.shutdown(wait=True, cancel_futures=False)
-        self.lease.release()
-        self.lease_path.unlink(missing_ok=True)
+    def _release_owner(self):
+        with self._guard:
+            if self._shutdown_published and all(f.done() for f in self._futures):
+                self.lease.release()
+                self.lease_path.unlink(missing_ok=True)
+
+    def close(self,timeout=2):
+        if not isinstance(timeout,(int,float)) or not 0<=timeout<=30:raise DomainError('JOB','Shutdown wait must be between zero and 30 seconds.')
+        with self._guard:
+            if self._closing:return
+            self._closing=True
+            futures=dict(self._futures)
+        for future,(workspace,ident) in futures.items():
+            if not future.done():self.cancel(workspace,ident)
+        self.pool.shutdown(wait=False,cancel_futures=True)
+        for future,(workspace,ident) in futures.items():
+            if future.cancelled():self._update(workspace,ident,status='cancelled',progress='cancelled during shutdown')
+        with self._guard:self._shutdown_published=True
+        if futures:wait(futures,timeout=timeout)
+        # A still-running native callback keeps its owner lease until its final
+        # publication. Python process exit may wait for that native boundary.
+        self._release_owner()

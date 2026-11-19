@@ -90,6 +90,8 @@ class QualityGate:
                 tile_ids.extend(sheet['notes'])
                 for side in ('fronts','backs'):
                     blobs[f'{side}-{i}.png']=Path(sheet[side]).read_bytes()
+            if len(blobs)>250 or sum(len(v) for v in blobs.values())>128*1024*1024:
+                raise DomainError('LIMIT','Narrow the rendered quality packet; no evidence was silently omitted.')
             self.c._current(run_id,p.digest)
             (path/'packet').mkdir();(path/'supervisor').mkdir()
             for name,data in blobs.items():
@@ -110,6 +112,15 @@ class QualityGate:
         media={name:str(self.c.s.store.path(workspace,m['path'])) for name,m in proposal.media.items()}
         for card in proposal.review_cards:
             model=card['model'];fields=card['fields'];kind=card['kind']
+            from html.parser import HTMLParser
+            from urllib.parse import unquote
+            class References(HTMLParser):
+                def handle_starttag(self,tag,attrs):
+                    if tag=='img':
+                        for key,value in attrs:
+                            if key=='src' and value and unquote(value) in media:media[value]=media[unquote(value)]
+            refs=References()
+            for value in fields.values():refs.feed(value)
             if kind=='io':
                 from cards.render.occlusion import bodies
                 fronts,answer=bodies(build,fields,media)

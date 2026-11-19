@@ -20,7 +20,7 @@ def test_explicit_preference_confirmation_updates_guide_and_survives_restart(tmp
         assert 'chapters 2 and 3' in guide.read_text()
         assert 'Setup still needs verification' in guide.read_text()
         assert not result['configuration']['onboarding_complete']
-        assert api.confirm_preferences(proposal['id'])['configuration']['config_version']==2
+        assert api.confirm_preferences(proposal['id'])['configuration']['config_version']==result['configuration']['config_version']
     finally:s.close()
     s=Service(tmp_path/'work',[tmp_path])
     try: assert API(s).get_student_setup()['configuration']['source_materials']==['textbook chapters']

@@ -133,8 +133,12 @@ def run(args):
     deck = (title if usable else out['topic'].replace('::',' - '))[:100]
     own = state.get('facts',{}).get('deck_has_source_tag',False)
     if deck in listing and not own:
-        suffix = f" ({course.replace('::',' - ')} L{out['number']:03d})"
-        deck = deck[:max(0,100-len(suffix))]+suffix
+        base=deck;serial=1
+        while deck in listing:
+            counter='' if serial==1 else ' '+str(serial)
+            suffix = f" ({course.replace('::',' - ')} L{out['number']:03d}{counter})"
+            deck = base[:max(0,100-len(suffix))]+suffix
+            serial+=1
     out.update(deck=deck,deck_source='slide1' if usable else 'filename',create_deck=deck not in listing,
                title=out.pop('topic'), note_type='ColdRecall Cloze')
     out['legacy_tags'] = [out.pop('legacy_src_tag'),out.pop('legacy_topic_tag'),

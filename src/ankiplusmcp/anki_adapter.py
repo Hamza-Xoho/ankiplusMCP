@@ -32,6 +32,14 @@ class AnkiAdapter:
         except Exception:
             raise DomainError('TRANSPORT', 'Companion request outcome is unknown; reconcile before any retry.') from None
         if result.isError:
+            if name=='conditional_student_operation':
+                prefix='Error executing tool conditional_student_operation: '
+                for content in getattr(result,'content',[]):
+                    value=getattr(content,'text','')
+                    if isinstance(value,str) and value.startswith(prefix+'[conflict]'):
+                        raise DomainError('CONFLICT','Conditional companion preconditions changed; review the target again.')
+                    if isinstance(value,str) and value.startswith(prefix+'[uncertain]'):
+                        raise DomainError('UNCERTAIN','The companion attempted the operation but could not verify its exact outcome.')
             raise DomainError('COMPANION', 'Companion refused the operation; inspect state before retrying.')
         value = result.structuredContent
         if not isinstance(value, dict):
@@ -53,6 +61,23 @@ class AnkiAdapter:
         if not isinstance(ids, list) or len(ids)>maximum or any(type(i) is not int or i<=0 for i in ids) or len(set(ids))!=len(ids):
             raise DomainError('PROTOCOL', 'Invalid or repeated typed record IDs.')
         return ids
+
+    async def list_decks(self):
+        binding=await self.collection_identity()
+        value=await self._call('list_decks',{'include_stats':False})
+        rows=value.get('decks')
+        if not isinstance(rows,list) or len(rows)>500 or value.get('total')!=len(rows):
+            raise DomainError('LIMIT','A complete deck listing of at most 500 decks is required.')
+        ids=[];result=[]
+        for row in rows:
+            if (not isinstance(row,dict) or type(row.get('deck_id')) is not int or row['deck_id']<=0
+                or not isinstance(row.get('name'),str) or not 1<=len(row['name'])<=200 or type(row.get('is_filtered')) is not bool):
+                raise DomainError('PROTOCOL','Companion returned incomplete deck metadata.')
+            ids.append(row['deck_id'])
+            result.append({k:row[k] for k in ('deck_id','name','is_filtered')})
+        if len(set(ids))!=len(ids):raise DomainError('PROTOCOL','Companion returned repeated deck identities.')
+        if await self.collection_identity()!=binding:raise DomainError('CONFLICT','Collection session changed during deck discovery.')
+        return binding,result
 
     async def search_notes(self, query):
         if not isinstance(query, str) or not 1<=len(query)<=2000:
@@ -137,7 +162,9 @@ class AnkiAdapter:
             raise DomainError('UNSUPPORTED','Conditional companion operations are required.')
         binding=await self.collection_identity()
         state=await self._call('student_operation_state',{'operation':operation,'arguments':arguments})
-        if state.get('version')!=1 or state.get('binding')!=binding or state.get('operation')!=operation or state.get('arguments')!=arguments or 'target' not in state:
+        if state.get('version')!=2 or not isinstance(state.get('media'),dict):
+            raise DomainError('UNSUPPORTED','Media-bound conditional companion state version 2 is required.')
+        if state.get('binding')!=binding or state.get('operation')!=operation or state.get('arguments')!=arguments or 'target' not in state:
             raise DomainError('CONFLICT','Companion state does not bind this exact request and session.')
         return state
 
@@ -187,7 +214,7 @@ class AnkiAdapter:
             if operation == 'add_note' and target['model'].get('name') != arguments.get('model_name'):
                 raise DomainError('CONFLICT', 'Captured model does not match the proposal.')
         result = await self.dispatch(operation, arguments, state)
-        if result.get('version') != 1 or result.get('binding') != state.get('binding') or not isinstance(result.get('result'), dict):
+        if result.get('version') != 2 or result.get('binding') != state.get('binding') or not isinstance(result.get('result'), dict):
             raise DomainError('PROTOCOL', 'Write acknowledgement is incomplete; reconcile before retrying.')
         if operation == 'add_note' and (type(result['result'].get('note_id')) is not int or result['result']['note_id'] <= 0):
             raise DomainError('PROTOCOL', 'Created note identity is missing or invalid; reconcile before retrying.')
@@ -216,7 +243,7 @@ class AnkiAdapter:
                 results.append({'status':'acknowledged', 'acknowledgement':acknowledgement})
             except DomainError as exc:
                 # No automatic resend, and never discard earlier acknowledgements.
-                uncertain = exc.code in ('TRANSPORT', 'PROTOCOL', 'COMPANION')
+                uncertain = exc.code in ('TRANSPORT', 'PROTOCOL', 'COMPANION', 'UNCERTAIN')
                 results.append({'status':'uncertain' if uncertain else 'conflict', 'code':exc.code})
                 break
         return results

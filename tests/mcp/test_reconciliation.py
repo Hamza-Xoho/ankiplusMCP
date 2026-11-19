@@ -103,3 +103,43 @@ def test_already_unsuspended_after_review_is_unchanged_not_sent(workflow):
     p=approved(workflow);e.cards[201]['queue']=0
     result=run(c.apply(r.id,p.digest))
     assert result['results'][0]['status']=='unchanged' and not e.sent
+
+
+def test_preflight_failure_is_durably_failed_without_a_send_or_uncertain_intent(workflow):
+    c,s,e,r,d=workflow;p=approved(workflow)
+    original=e.call_tool
+    async def unavailable(name,args):
+        if name=='student_operation_state':raise TimeoutError('offline before conditional dispatch')
+        return await original(name,args)
+    e.call_tool=unavailable
+    result=run(c.apply(r.id,p.digest))
+    assert result['results'][0]['status']=='failed'
+    assert result['results'][0]['delivery']=='not_sent'
+    assert not c.unresolved() and not e.sent
+
+
+def test_recovered_acknowledged_create_restores_mapping_for_repeat_run(workflow,monkeypatch):
+    c,s,e,r,d=workflow;p=approved(workflow)
+    original=c._verify
+    async def crash(*args):raise KeyboardInterrupt()
+    monkeypatch.setattr(c,'_verify',crash)
+    with pytest.raises(KeyboardInterrupt):run(c.apply(r.id,p.digest))
+    monkeypatch.setattr(c,'_verify',original)
+    run(c.reconcile(r.id))
+    second=c.start(r.workspace,[1]);run(c.coverage(second.id,'collagen',[d]))
+    assert run(c.stage(second.id)).decisions[0]['disposition']=='already_covered'
+    assert len(e.sent)==1
+
+
+def test_tier_child_failure_is_visible_in_partial_summary(workflow):
+    c,s,e,r,d=workflow;s.patch_cards(r.workspace,[{'id':'fibroblast','changes':{'tier':3}}],1)
+    p=approved(workflow);original=e.call_tool
+    async def unavailable(name,args):
+        if name=='student_operation_state' and args['operation']=='card_suspend':raise TimeoutError()
+        return await original(name,args)
+    e.call_tool=unavailable
+    result=run(c.apply(r.id,p.digest))
+    assert result['counts']['notes_created']==1
+    assert result['counts']['failed_operations']==1
+    assert result['counts']['cards_suspended']==0
+    assert len(e.sent)==1

@@ -13,7 +13,7 @@ from .quality import QualityGate
 from .runs import _encoded,_publish
 from .store import DomainError,digest
 
-REQUIRED=('storage','connection','interactive_review','quality_runtime','guide')
+REQUIRED=('preferences','storage','connection','interactive_review','quality_runtime','guide')
 
 
 class SetupStatus(Model):
@@ -39,10 +39,41 @@ class Onboarding:
             checks[record['step']]=record['result']
         config=self.c.config.read()
         # Historical completion does not establish a newly selected profile/type.
+        choice=checks.get('preferences',{})
+        values={k:getattr(config,k) for k in self.c.config.MUTABLE}
+        if choice.get('status')=='passed' and choice.get('choice_values')!=values:checks['preferences']={'status':'required','code':'PREFERENCES_CHANGED'}
         connection=checks.get('connection',{})
         if connection.get('status')=='passed' and connection.get('preferences')!={'profile':config.profile,'note_type':config.note_type}:
             checks['connection']={'status':'required','code':'PREFERENCES_CHANGED'}
         return checks
+
+    def propose_choices(self,changes):
+        from .run_preferences import preference_diff
+        config=self.c.config.read()
+        change=self.c.config.propose(changes,config.config_version,allow_unchanged=True)
+        return {**change.model_dump(),'scope':'future_preferences',
+            'diff':preference_diff(change.before.model_dump(),change.after.model_dump(),change.changed_keys) or ['Keep these setup choices.'],
+            'questions':['Which source materials will you use? Custom sources are welcome.',
+                'Which relevant existing decks should be searched? Include your own decks; no premade deck is required.',
+                'Review drafts before applying? Recommended: review on, uncertain matches pending.'],
+            'data_folder':str(self.s.store.root)}
+
+    def _preference_evidence(self):
+        config,pointer=self.c.config._current()
+        change_id=pointer.get('change_id')
+        if not change_id:raise DomainError('SETUP','Review and explicitly confirm your setup choices first.')
+        from .configuration import ConfigChange
+        proposal=ConfigChange.model_validate(self.c.config._json(self.c.config.directory/'proposals'/(change_id+'.json')))
+        values={k:getattr(config,k) for k in self.c.config.MUTABLE}
+        if any(getattr(proposal.after,k)!=v for k,v in values.items()):raise DomainError('SETUP','Saved choices changed after confirmation.')
+        return {'status':'passed','evidence_sha256':sha({'change_id':change_id,'choices':values}),'choice_values':values}
+
+    def confirm_choices(self,change_id):
+        self.c.config.confirm(change_id)
+        self._record('preferences',self._preference_evidence())
+        guide=self.refresh_guide()
+        self._record('guide',{'status':'passed','path':str(guide),'evidence_sha256':digest(guide)})
+        return self.status()
 
     def status(self):
         config=self.c.config.read();checks=self._checks()
@@ -69,7 +100,10 @@ class Onboarding:
         if not isinstance(evidence,dict):raise DomainError('SETUP','Setup evidence must be a structured record.')
         config=self.c.config.read()
         try:
-            if step=='storage':
+            if step=='preferences':
+                if evidence:raise DomainError('SETUP','Setup choices are verified from explicit preference confirmation, not pass assertions.')
+                result=self._preference_evidence()
+            elif step=='storage':
                 if evidence:raise DomainError('SETUP','Storage is checked directly, not from caller assertions.')
                 path=self.c.config.directory/('.storage-probe-'+uuid4().hex+'.json')
                 value={'probe':uuid4().hex}
@@ -114,6 +148,9 @@ class Onboarding:
                 result={'status':'passed','path':str(guide),'evidence_sha256':digest(guide)}
         except (DomainError,OSError,ValueError) as exc:
             result={'status':'failed','code':getattr(exc,'code','STORAGE'),'remedy':getattr(exc,'remedy','Check the chosen data folder or supply actual host evidence.')}
+        return self._record(step,result)
+
+    def _record(self,step,result):
         # Unique monotonic sequence under the same configuration lock used for preferences.
         with self.c.config._lock():
             number=max((int(p.stem) for p in self.directory.glob('[0-9]'*20+'.json')),default=0)+1

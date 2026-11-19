@@ -19,7 +19,7 @@ from .runs import _encoded,_publish
 def onboard_main(argv):
     parser=argparse.ArgumentParser(prog='ankiplusmcp onboard')
     parser.add_argument('--workspace-root',default=str(settings.default_workspace_root()))
-    parser.add_argument('--step',choices=('storage','connection','guide'))
+    parser.add_argument('--step',choices=('preferences','storage','connection','guide'))
     parser.add_argument('--json',action='store_true')
     parser.add_argument('--companion-url');parser.add_argument('--anki-profile');parser.add_argument('--anki-collection-path');parser.add_argument('--companion-token-file')
     args=parser.parse_args(argv)

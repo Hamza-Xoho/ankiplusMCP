@@ -45,8 +45,7 @@ class API:
                 'missing_dependency_remedy':doctor.FIXES}
 
     def _student_config(self):
-        from .configuration import ConfigStore
-        return ConfigStore(self.s.store.root / '.student-workflows')
+        return self._coordinator().config
 
     def get_student_setup(self) -> dict:
         """Resume saved student preferences and show remaining verified setup requirements."""
@@ -56,7 +55,7 @@ class API:
         value['ready_to_apply']=status.onboarding_complete
         return value
 
-    async def advance_student_setup(self, step: Literal['storage','connection','interactive_review','quality_runtime','guide'], evidence: dict) -> dict:
+    async def advance_student_setup(self, step: Literal['preferences','storage','connection','interactive_review','quality_runtime','guide'], evidence: dict) -> dict:
         """Run a required setup check or validate actual trusted host evidence. Caller completion assertions are refused."""
         from .onboarding import Onboarding
         status=await Onboarding(self.s).advance(step,evidence)
@@ -64,15 +63,30 @@ class API:
 
     def propose_preferences(self, changes: dict, expected_version: Annotated[int,Field(ge=1)]) -> dict:
         """Show a lasting preference diff without saving it. Run-only choices need no saved change."""
-        return self._student_config().propose(changes,expected_version).model_dump()
+        from .run_preferences import preference_diff
+        change=self._student_config().propose(changes,expected_version)
+        return {**change.model_dump(),'scope':'future_preferences','diff':preference_diff(change.before.model_dump(),change.after.model_dump(),change.changed_keys)}
 
     def confirm_preferences(self, change_id: str) -> dict:
         """Explicitly save a shown preference change and refresh the tailored guide, preserving personal notes."""
         from .onboarding import Onboarding
-        config=self._student_config().confirm(change_id)
+        status=Onboarding(self.s).confirm_choices(change_id)
+        config=status.configuration
         if config.source_roots:self.s.store.set_source_roots([Path(p) for p in config.source_roots],'preferences')
-        guide=Onboarding(self.s).refresh_guide()
-        return {**self.get_student_setup(),'guide_path':str(guide)}
+        return {**status.model_dump(),'ready_to_apply':status.onboarding_complete}
+
+    def propose_student_setup(self, choices: dict) -> dict:
+        """Show complete setup choices for explicit confirmation, including keeping defaults. No premade deck is required."""
+        from .onboarding import Onboarding
+        return Onboarding(self.s).propose_choices(choices)
+
+    async def get_collection_choices(self, offset: Offset=0, limit: Limit=20) -> dict:
+        """Inspect own or premade decks for setup. Filtered decks are identified; no collection changes."""
+        from .run_responses import page
+        async with self._coordinator()._connection() as adapter:binding,decks=await adapter.list_decks()
+        values=[{**row,'eligible_for_scope':not row['is_filtered']} for row in decks]
+        rows,next_offset=page(values,offset,limit)
+        return {'binding':binding,'decks':rows,'total':len(values),'next_offset':next_offset,'premade_deck_required':False}
 
     async def search_collection_coverage(self, query: Annotated[str,Field(min_length=1,max_length=2000)]) -> dict:
         """Search complete bounded note/card coverage from an explicitly configured companion. Never mutates Anki."""
@@ -118,11 +132,51 @@ class API:
 
     def get_run_proposal(self, run_id: str, offset: Offset=0, limit: Limit=10) -> dict:
         """Read a bounded page of proposed cards, actions, source evidence and unresolved findings."""
+        from .review_session import ReviewSession
+        from .run_responses import page
         p=self._coordinator()._latest(run_id)
+        previews=[]
+        for card in p.cards:
+            fields,truncated=ReviewSession._fields(card['fields'],budget=4000)
+            previews.append({k:card[k] for k in ('id','kind','action','tier','note_id')} | {'fields':fields,'truncated_fields':truncated})
+        cards,next_offset=page(previews,offset,limit,budget=16000)
         return {'run_id':run_id,'digest':p.digest,'content_digest':p.content_digest,'source':p.source,
-                'cards':p.cards[offset:offset+limit],'decisions':p.decisions[offset:offset+limit],
-                'findings':p.findings[offset:offset+limit],'total':len(p.cards),
-                'next_offset':offset+limit if offset+limit<len(p.cards) else None}
+                'cards':cards,'total':len(previews),'next_offset':next_offset,
+                'findings_total':len(p.findings),'exact_records':'get_run_history then read_run_record'}
+
+    def get_run_results(self, run_id: str, offset: Offset=0, limit: Limit=10) -> dict:
+        """Read cumulative per-item outcomes without losing partial results to a response limit."""
+        from .run_responses import application_summary
+        c=self._coordinator()
+        return application_summary(c._summary(run_id,c._latest(run_id)),offset,limit)
+
+    def get_run_history(self, run_id: str, offset: Offset=0, limit: Limit=100) -> dict:
+        """Read permanent event summaries; read_run_record returns exact evidence in bounded slices."""
+        from .run_responses import page
+        run=self._coordinator().runs.read(run_id)
+        rows=[{'sequence':e.sequence,'kind':e.kind,'timestamp':e.timestamp} for e in run.events]
+        events,next_offset=page(rows,offset,limit)
+        return {'run_id':run_id,'events':events,'total':len(rows),'next_offset':next_offset}
+
+    def read_run_record(self, run_id: str, sequence: Annotated[int,Field(ge=1)], offset: Offset=0) -> dict:
+        """Read exact retained JSON evidence in 4,000-character slices. Never accesses arbitrary paths."""
+        if type(sequence) is not int or sequence<1 or type(offset) is not int or offset<0:raise DomainError('LIMIT','Invalid record slice.')
+        run=self._coordinator().runs.read(run_id)
+        event=next((e for e in run.events if e.sequence==sequence),None)
+        if event is None:raise DomainError('RUN','Unknown event sequence.')
+        text=json.dumps(event.model_dump(),ensure_ascii=False,sort_keys=True)
+        return {'run_id':run_id,'sequence':sequence,'text':text[offset:offset+4000],
+                'next_offset':offset+4000 if offset+4000<len(text) else None}
+
+    def list_student_runs(self, offset: Offset=0, limit: Limit=20) -> dict:
+        """Resume durable runs by source label/workspace, with bounded summaries and corruption notices."""
+        from .run_responses import page
+        catalog=self._coordinator().runs.catalog()
+        rows=[{'id':p.snapshot.id,'workspace':p.snapshot.workspace,'source':p.snapshot.selection.label,
+               'last_event':p.snapshot.events[-1].kind,'updated_at':p.snapshot.events[-1].timestamp} for p in catalog.changed]
+        rows.sort(key=lambda row:(row['updated_at'],row['id']),reverse=True)
+        runs,next_offset=page(rows,offset,limit)
+        return {'runs':runs,'total':len(rows),'next_offset':next_offset,'errors':dict(list(catalog.errors.items())[:20]),'error_count':len(catalog.errors)}
 
     def authorize_run(self, run_id: str, proposal_digest: str, mode: Literal['user','config']='user') -> dict:
         """Authorize this exact validated proposal; quality checks apply to both user and configuration authorization."""
@@ -145,11 +199,13 @@ class API:
 
     async def apply_run(self, run_id: str, proposal_digest: str) -> dict:
         """Apply only an exactly authorized, quality-validated proposal with durable per-item intent and readback."""
-        return await self._coordinator().apply(run_id,proposal_digest)
+        from .run_responses import application_summary
+        return application_summary(await self._coordinator().apply(run_id,proposal_digest))
 
     async def reconcile_run(self, run_id: str) -> dict:
         """Read back uncertain intents by known identities; never resend creates or roll back collection data."""
-        return await self._coordinator().reconcile(run_id)
+        from .run_responses import application_summary
+        return application_summary(await self._coordinator().reconcile(run_id))
 
     async def open_run_review(self, run_id: str) -> dict:
         """Open the production source-linked review App for this exact run. No collection writes."""
@@ -176,6 +232,14 @@ class API:
         """Explicit user approval from a current bound review session; existing quality gates remain mandatory."""
         from .review_session import ReviewSession
         return ReviewSession(self._coordinator()).approve(run_id,session_token,expected_proposal_digest)
+
+    def propose_run_preferences(self, run_id: str, changes: dict) -> dict:
+        """Show a plain-language preference diff for this run only; future defaults stay unchanged."""
+        return self._coordinator().propose_run_preferences(run_id,changes)
+
+    def confirm_run_preferences(self, run_id: str, change_id: str) -> dict:
+        """Explicitly confirm a shown run-only choice and invalidate affected staged authorization."""
+        return self._coordinator().confirm_run_preferences(run_id,change_id)
 
     def get_guidance(self, topic: Literal['overview','quality','maintainer','student']='overview') -> dict:
         """Read optional workflow examples or card/reviewer guidance. No prescribed tool sequence."""
@@ -318,6 +382,11 @@ class API:
         """Summarize planned actions, caller-reported results, ambiguity and stale plans. Never claims AnkiPlus performed collection writes."""
         return self.s.get_report(workspace)
 
+    def cleanup_derived(self, workspace: Workspace, apply: bool=False, expected_digest: str | None=None) -> dict:
+        """Preview explicit removal of reproducible workspace previews; apply only the exact shown digest. Permanent evidence is protected."""
+        from .cleanup import DerivedCleanup
+        return DerivedCleanup(self.s).run(workspace,apply,expected_digest)
+
     def list_artifacts(self, workspace: Workspace, offset: Offset=0, limit: Limit=50) -> dict:
         """List workspace-local source, preview, review and payload artifacts with pagination."""
         return self.s.artifacts(workspace,offset,limit)
@@ -365,7 +434,7 @@ async def resolve_roots(server, store):
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
-    read_only={'read_run_review','read_run_review_field','get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
+    read_only={'get_collection_choices','get_run_results','get_run_history','read_run_record','list_student_runs','read_run_review','read_run_review_field','get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):
         if name.startswith('_'): continue
         def wrap(method):

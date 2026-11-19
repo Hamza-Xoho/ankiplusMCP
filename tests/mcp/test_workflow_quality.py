@@ -167,3 +167,14 @@ def test_image_only_pdf_evidence_packet_contains_actual_cited_page(tmp_path):
         pages=[n for n in ticket['files'] if n.startswith('source-page-') and n.endswith('.png')]
         assert pages and (Path(ticket['packet_path'])/pages[0]).read_bytes().startswith(b'\x89PNG')
     finally:s.close()
+
+
+def test_changed_quality_rules_invalidate_prior_passing_evidence(workflow,tmp_path,monkeypatch):
+    import shutil
+    import cards.review.packets as packets
+    c,s,e,r,d=workflow;covered(workflow);p=quality_ready(workflow)
+    copied=tmp_path/'quality-rules';shutil.copytree(packets.TEMPLATES,copied)
+    monkeypatch.setattr(packets,'TEMPLATES',copied)
+    with (copied/'house-style.md').open('a') as stream:stream.write('\nAn additional required policy.\n')
+    with pytest.raises(DomainError,match='STALE'):c.authorize(r.id,p.digest,'user')
+    assert not e.sent

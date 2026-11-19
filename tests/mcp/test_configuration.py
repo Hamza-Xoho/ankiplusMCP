@@ -52,3 +52,13 @@ def test_each_confirmed_configuration_change_is_permanent_and_inspectable(tmp_pa
     assert saved.selected_decks == []
     assert m.ConfigStore(tmp_path).read().config_version == 2
     assert store.read_version(1).source_materials == []
+
+
+@pytest.mark.parametrize('changes',[{'tag_root':'*'},{'tag_root':'#Anki*'},{'selected_decks':['Default','Default']},{'source_roots':['relative/path']}])
+def test_invalid_saved_scope_is_rejected_before_confirmation(tmp_path,changes):
+    from ankiplusmcp.configuration import ConfigStore
+    from pydantic import ValidationError
+    from ankiplusmcp.store import DomainError
+    store=ConfigStore(tmp_path)
+    with pytest.raises((ValidationError,DomainError)):store.propose(changes,1)
+    assert store.read().config_version==1
