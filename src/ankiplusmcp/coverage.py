@@ -2,6 +2,7 @@
 import hashlib
 import json
 import re
+from filelock import FileLock, Timeout
 from uuid import uuid4
 from typing import Literal
 
@@ -61,6 +62,14 @@ class CoverageStore:
         self.runs, self.config, self.evidence = runs, config, evidence
 
     def record(self, run_id: str, snapshot: CollectionSnapshot, decisions: list[CoverageDecision], *, batch_id: str | None = None, preferences=None) -> list[CoverageDecision]:
+        # A retry must observe the committed winner before reading configuration.
+        # Keep this separate from event/workflow locks (both may be acquired below).
+        try:
+            with FileLock(self.runs._path(run_id)/'.coverage.lock',timeout=5):
+                return self._record(run_id,snapshot,decisions,batch_id=batch_id,preferences=preferences)
+        except Timeout:raise DomainError('BUSY','Another coverage batch is active; retry after it finishes.') from None
+
+    def _record(self, run_id, snapshot, decisions, *, batch_id=None, preferences=None):
         batch_id=uuid4().hex if batch_id is None else batch_id
         if not isinstance(batch_id,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}',batch_id):
             raise DomainError('COVERAGE','Invalid coverage batch identifier.')

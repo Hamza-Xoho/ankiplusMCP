@@ -42,3 +42,11 @@ responsive captures and restored product context. The same UI reviewer scored
 only these listed fixes: **all resolved; ship for the scored fixes**. This is not
 a second engineering review or independent Anki card-quality/Mac acceptance.
 Full UI evidence remains in the preserved production integration ledger.
+
+Final full regression also reproduced existing coverage retry contention: two
+identical concurrent batches raced on the nonblocking configuration lock. A new
+deterministic held-read regression failed first, then a bounded separate per-run
+coverage lock made the retry reuse the committed winner before configuration
+read. Focused coverage/coordinator/workflow concurrency32passed, including the
+existing requirement that configuration reads remain BUSY during dispatch. This
+is a root regression repair in the same material fix pass, not a new review.

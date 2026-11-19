@@ -84,6 +84,32 @@ def test_concurrent_batch_retry_has_one_winner(tmp_path):
     finally:s.close()
 
 
+def test_concurrent_retry_waits_for_same_batch_configuration_read(tmp_path,monkeypatch):
+    from threading import Event,Lock
+    s,c,r,snap,sha=setup(tmp_path);entered=Event();release=Event();started=Event();guard=Lock();calls=0
+    original=c.config.read
+    def paused():
+        nonlocal calls
+        with guard:calls+=1;first=calls==1
+        if not first:return original()
+        with c.config._lock():
+            entered.set();assert release.wait(5)
+            return c.config._current()[0]
+    monkeypatch.setattr(c.config,'read',paused)
+    def retry():started.set();return c.record(r.id,snap,[decision(sha)],batch_id='same')
+    try:
+        with ThreadPoolExecutor(2) as pool:
+            first=pool.submit(c.record,r.id,snap,[decision(sha)],batch_id='same')
+            assert entered.wait(2)
+            second=pool.submit(retry);assert started.wait(2)
+            try:
+                with pytest.raises(TimeoutError):second.result(timeout=.2)
+            finally:release.set()
+            assert first.result(timeout=3)==second.result(timeout=3)
+        assert len(c.runs.read(r.id).events)==2 and calls==1
+    finally:release.set();s.close()
+
+
 def test_batch_search_keeps_note_card_units(tmp_path):
     s,c,r,snap,sha=setup(tmp_path)
     try:
