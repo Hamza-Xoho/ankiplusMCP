@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { fakeUv, repoRoot, runCli, tempDir } from './helpers.mjs';
 import { HOSTS } from '../lib/hosts.mjs';
 
-const REF = 'github:Hamza-Xoho/ankiplusMCP#v0.3.0';
+const VERSION = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8')).version;
+const REF = `github:Hamza-Xoho/ankiplusMCP#v${VERSION}`;
 const OTHER = { mcpServers: { other: { type: 'http', url: 'https://example.test/mcp' } } };
 const read = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const backups = (dir) => readdirSync(dir).filter((name) => name.includes('.ankiplusmcp-backup-'));

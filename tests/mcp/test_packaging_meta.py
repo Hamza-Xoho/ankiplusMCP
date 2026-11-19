@@ -10,7 +10,8 @@ ROOT = Path(__file__).parents[2]
 def test_version_comes_from_metadata(tmp_path):
     s = Service(tmp_path, [tmp_path])
     try:
-        assert API(s).capabilities()['version'] == importlib.metadata.version('ankiplusmcp') == '0.3.0'
+        project = tomllib.loads((ROOT/'pyproject.toml').read_text())['project']
+        assert API(s).capabilities()['version'] == importlib.metadata.version('ankiplusmcp') == project['version']
     finally:
         s.close()
 
