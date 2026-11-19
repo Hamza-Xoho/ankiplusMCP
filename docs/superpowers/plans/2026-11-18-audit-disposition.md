@@ -61,3 +61,20 @@ Plan task numbers refer to `2026-11-18-student-workflows.md`.
 ## Closure record format
 
 For each item record: ID, verified revision, reproduction/test, actual impact, chosen fix or reason for deferral, compatibility effect, quality-baseline result and acceptance evidence. “Needs investigation” items affecting a release requirement must resolve before release; optional optimisations may close as explicitly deferred.
+
+## Verified continuation evidence (2026-11-19)
+
+These are scoped updates, not closure of the full register:
+
+| IDs | Source | Reproduction and disposition | Compatibility / acceptance boundary |
+| --- | --- | --- | --- |
+| A7 (corrupt-state containment), B3 (job discovery), E2 (bounded response) | `8d068fa` | Three failed-first regressions reproduced unreadable-job list failure, non-object-record crash and invalid owner acceptance. Damaged records now remain intact; valid jobs and bounded error pages remain discoverable. Discovery/locking/store suite: 13 passed. | Clean listing shape retained; optional error summaries and continuation apply when damage exists. Broader corrupt-state, shutdown and response-budget requirements remain open. |
+| G8 | `758dd18` | Version expectations now derive from declared/installed metadata. A complete disposable launcher+skills copy at manifest version 9.9.9 failed with old assertions and passed 29/29 with corrected assertions; actual repository Python checks passed 19/19 and launcher 42/42. | No package version/runtime changed. Synthetic fake-child version stays an arbitrary forwarding control. Registry publication and real-host acceptance remain separate. |
+| B4, D3 (caller-receipt read recovery only) | `510c1e4` | The fresh whole-branch reviewer reproduced lost visibility of durable journal evidence after interrupted projection. Four restart/report/import regressions and a legacy-wrapper preservation regression failed first, then passed. Shared read-only folding now preserves all saved caller receipts without a second recording call. | Full suite 634 passed/25 existing skips; no original JSON mutation, independent Anki verification or collection retry. Production intent/apply/reconciliation requirements remain open. |
+| D6, E3, E4 | Existing Mac reports, not freshly inspected raw evidence | Reviewer provenance, complete sheet inspection, active companion schemas and text-channel forwarding remain unresolved. The subsequent supplied response describes instructions read from origin, not their execution results. | Do not close these from report filenames, installed candidates, synthetic UI results or estimated tokens. Both response channels retained. |
+
+Raw logs, including the corrected disposable-copy attempt and its initial missing
+skill-folder failure, remain ignored in the original plan's workspace. No private
+Mac transcripts, credentials or collection data were committed. The current
+whole-branch engineering review is distinct from the still-required independent
+product-quality reviewers and real-platform acceptance.

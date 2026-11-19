@@ -112,3 +112,48 @@ Exact RED/GREEN and final verification evidence remain in the original plan ledg
 Adapter/coordinator/UI/onboarding integration, further audit work and all required
 external acceptance remain incomplete. A complete payload-specific isolated-profile
 proposal requires the actual companion schemas before requesting authorization.
+
+### Fresh engineering review and receipt recovery
+
+The single fresh whole-branch engineering review covered `b0f4233..758dd18`
+(including the version-test repair), independently ran 113 focused tests, and
+reported one Important finding, no Critical findings and no deferred Minors.
+A durable caller receipt could be omitted from reports and legacy history imports
+after interruption between journal publication and projection publication.
+
+Fix `510c1e4` adds shared read-only projection/journal folding to recording,
+reporting and import. Four restart regressions failed first for both absent and
+older projections, then passed without another recording call. A fifth failed-first
+regression preserves the exact old projection wrapper and therefore its import
+fingerprint. Reports lock the workspace for consistent reads. Import/report reads
+retain original JSON bytes and semantic revisions. All recovered results retain
+caller-supplied provenance; no external readback or Anki success is manufactured.
+The affected result/history/card suite passed 33 tests with one existing browser
+skip. No second review was substituted for the regression fix pass.
+
+Fresh checks after the fix:
+
+- `CARDS_PUBLIC_CI=1 .venv/bin/python -m pytest -q`: **634 passed, 25 existing skips**.
+- `./scripts/check-mcp.sh`: **401 passed, one existing skip**; all frozen hashes,
+  wheel/version/privacy checks, **42/42 hooks**, CLI golden **IDENTICAL
+  (66 files, 14 commands)**.
+- `npm test`: **42/42** after the test-only G8 repair; launcher runtime is unchanged.
+- `.venv/bin/uv lock --check` and `git diff --check`: passed.
+
+Raw review, failed-first tests, complete logs and image identities remain under
+ignored `.superpowers/sdd/2026-11-18-student-workflows/`. The full-suite skips
+remain 24 private-fixture cases and one system-Chrome case; they are not waived
+acceptance. The entire original plan and its ledger remain open. Active companion
+attribution/schemas, exact isolated-profile proposal, real reviewer provenance and
+blind recall must be settled before specifying the production integrations.
+Further audit repair, protected derived cleanup, full onboarding and end-to-end
+acceptance remain outstanding. Successful local caller-receipt recovery does not
+prove interrupted collection-write recovery or normal-user readiness.
+
+Final container verification: Compose validation, image build and non-root,
+read-only, network-disabled real OCR/Chromium smoke passed at
+`510c1e4-dirty`. The dirty marker records the then-uncommitted audit/checkpoint
+documents; runtime source is commit `510c1e4`. Image inspection and complete
+build/smoke logs are retained in the same ignored workspace. Pinned-download
+retries recovered without changing requirements or isolation. No public service,
+profile switch, Anki endpoint or collection operation was introduced.
