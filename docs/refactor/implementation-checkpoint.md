@@ -180,3 +180,62 @@ whitespace checks, and privacy checks. Historical runtime results remain 634/25
 (public-CI tests/skips), 401/1 (MCP tests/skip), 42 launcher tests and the recorded
 hardened container smoke at 510c1e4-dirty. Runtime/container suites were not rerun
 for documentation-only changes; no fresh behavioral success is claimed.
+
+## Native integration continuation after aab80b8
+
+New primary code connects an explicit opt-in local MCP companion adapter to
+`search_collection_coverage`, with bounded complete search, full note reads,
+actual card ownership and suspension state. Missing capabilities, excerpts,
+foreign/missing records, changed sessions and inconsistent fields/siblings refuse
+results. The native transport requires explicit endpoint/profile/path; it does
+not discover, launch or reconfigure Anki. The default and container remain
+unconnected. Existing public tool contracts are preserved; new tools are additive.
+
+`get_student_setup`, `propose_preferences`, `confirm_preferences` connect versioned
+preferences and guide generation to MCP. Confirmation is explicit and repeatable;
+notes survive guide regeneration. Setup remains incomplete rather than claiming
+that saving preferences verifies UI/quality/collection capabilities.
+
+The companion branch now provides fixed conditional student operation state and
+dispatch. It checks complete profile/session/request/target state synchronously in
+one main-thread request, without arbitrary tool forwarding. Full-card backend
+serialization binds scheduling state. Creation uses actual Anki26.9.2 fields_check;
+media requires exact returned filename and exact byte readback. Renaming or lost
+verification is uncertain. Conditional suspension is not implemented. These
+capabilities are not installed on the Mac or authorized for real collections.
+
+One fresh engineering review of the whole branches and new implementation found
+four Important defects: incomplete scheduling state, mixed note/card coverage
+snapshots, unverified renamed media, and transport lifecycle exception leakage.
+All four were reproduced RED and fixed in one pass. No second review or product
+quality reviewer substitution occurred. The ignored follow-up ledger contains the
+report, original failures, final logs and rulings.
+
+Fresh verification: full primary public-mode **664 passed, 25 existing skips**
+(baseline644/25); check-mcp **431 passed, one existing skip** (baseline411/1),
+frozen12/hooks42/wheel/version/privacy and unchanged66-file14-command CLI golden.
+Launcher42/42 and lockfile/whitespace checks pass. Companion **880 passed, no
+skips** (baseline867), with packaged Linux Anki/aqt26.9.2 memory-stream checks
+passing textual and numeric add-on package names. No HTTP authentication/Qt/Mac
+acceptance is inferred. Container outcome is appended after completion below.
+
+This does **not** fulfill the requested full remaining product. The production
+coordinator, digest-bound staging/authorization, durable intent-before-send,
+per-item application/readback, uncertain-write reconciliation, production
+source-linked interactive review, complete verified onboarding and remaining
+audit/acceptance work are still required. The adapter is not an authorization
+system, and retrieved coverage is not proof of semantic completeness. No apply
+workflow is advertised. Source-derived boundary tests do not close real host or
+private quality gates. No weaker blind-recall gate was adopted. The known Mac
+host limitation remains precise; another repetitive reviewer launch/control check
+is unnecessary. Independent implementation remains the implementer's work, not an
+external action requested from the owner.
+
+Post-fix primary Compose validation/build and no-network/no-host-mount smoke
+passed for image `5841347-dirty` (source changes now committed as `2b00ddf`):
+non-root/read-only/cap-drop/no-new-privileges/resource limits, real OCR/Chromium,
+history migration/search and explicit preference/guide integration. The dirty
+label accurately records the uncommitted fixes at build start. No real companion,
+collection, registration or public endpoint was touched. Raw image identity and
+logs remain in the ignored follow-up workspace. Companion commits bc0d15d,
+4d15b1f and 7f051c6 are pushed to the authorized existing branch.
