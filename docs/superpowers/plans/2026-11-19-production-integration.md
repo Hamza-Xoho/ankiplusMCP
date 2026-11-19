@@ -66,3 +66,21 @@ Stale queued writes; missing/truncated ownership; media collision/renaming;
 uncertain create restart; forged/stale review or configuration decisions. Each
 belongs to its corresponding failed-first tests. Finish with one fresh branch
 review and one regression-tested material fix pass, not per-task reviewers.
+
+## Concrete adapter write interface supplement
+
+The original domain method names remain. Each write receives exact expected
+state captured during staging; no method may silently refresh it at application.
+`store_media(media)`, `create_notes(batch)` and `update_note(change)` consume
+an envelope `{arguments, expected_state}` (batch is 1–100 such envelopes).
+`set_suspended(card_ids, suspended, *, expected_state)` selects only the two
+fixed card primitives. Methods return per-operation companion envelopes; they
+make no product authorization or confirmed-readback claim. Sequential batch
+results preserve prior acknowledgements and stop on uncertainty; the coordinator
+uses single-item batches and journals each send independently.
+
+Before writes, validate complete fields, required template components and CSS
+against the captured model, not a model name alone. Unsupported/empty/malformed
+model metadata fails closed. Tests: partial fields and nonmatching model/style
+refuse; fixed suspension mapping; no arbitrary dispatch; batch partial results.
+Expected: focused adapter tests pass, then full check-mcp and frozen CLI checks.

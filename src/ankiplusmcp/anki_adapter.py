@@ -8,7 +8,7 @@ import hashlib
 from .coverage import ExistingNote
 from .store import DomainError
 
-OPERATIONS = frozenset({'add_note', 'update_note_fields', 'card_unsuspend', 'store_media_file'})
+OPERATIONS = frozenset({'add_note', 'update_note_fields', 'card_unsuspend', 'card_suspend', 'store_media_file'})
 
 
 class AnkiAdapter:
@@ -107,9 +107,27 @@ class AnkiAdapter:
         return cards
 
     async def read_note_type(self, name):
-        return {'fields':await self._call('model_field_names',{'model_name':name}),
-                'templates':await self._call('model_templates',{'model_name':name}),
-                'styling':await self._call('model_styling',{'model_name':name})}
+        if not isinstance(name, str) or not 1 <= len(name) <= 200:
+            raise DomainError('PROTOCOL', 'A bounded explicit note type name is required.')
+        binding = await self.collection_identity()
+        result = {'fields':await self._call('model_field_names',{'model_name':name}),
+                  'templates':await self._call('model_templates',{'model_name':name}),
+                  'styling':await self._call('model_styling',{'model_name':name, 'include_latex':True})}
+        if any(row.get('model_name') != name for row in result.values()):
+            raise DomainError('CONFLICT', 'Note type metadata belongs to a different model.')
+        names = result['fields'].get('field_names')
+        templates = result['templates'].get('templates')
+        if (not isinstance(names, list) or not names or any(not isinstance(n, str) or not n for n in names)
+                or len(set(names)) != len(names) or not isinstance(templates, dict) or not templates
+                or any(not isinstance(t, dict) for t in templates.values())):
+            raise DomainError('PROTOCOL', 'Incomplete note type fields or templates.')
+        model = {'flds':[{'name':n} for n in names],
+                 'tmpls':[{'qfmt':t.get('Front'), 'afmt':t.get('Back')} for t in templates.values()],
+                 'css':result['styling'].get('css')}
+        self.validate_note_type(model, dict.fromkeys(names, ''))
+        if await self.collection_identity() != binding:
+            raise DomainError('CONFLICT', 'Collection session changed during note type read.')
+        return result
 
     async def operation_state(self, operation, arguments):
         if operation not in OPERATIONS:
@@ -138,3 +156,65 @@ class AnkiAdapter:
         if len(data)>8*1024*1024 or result.get('filename')!=filename or result.get('size')!=len(data) or result.get('sha256')!=hashlib.sha256(data).hexdigest():
             raise DomainError('PROTOCOL','Media content verification failed.')
         return result
+
+
+    @staticmethod
+    def validate_note_type(model, fields):
+        if not isinstance(model, dict):
+            raise DomainError('PROTOCOL', 'Complete note type metadata is required.')
+        names = model.get('flds')
+        templates = model.get('tmpls')
+        if (not isinstance(names, list) or not names or
+                any(not isinstance(f, dict) or not isinstance(f.get('name'), str) for f in names) or
+                len({f['name'] for f in names}) != len(names)):
+            raise DomainError('PROTOCOL', 'Complete unique note type fields are required.')
+        if not isinstance(fields, dict) or set(fields) != {f['name'] for f in names} or any(not isinstance(v, str) for v in fields.values()):
+            raise DomainError('PROTOCOL', 'Complete model fields required.')
+        if (not isinstance(templates, list) or not templates or
+                any(not isinstance(t, dict) or any(not isinstance(t.get(k), str) or not t[k].strip()
+                    for k in ('qfmt', 'afmt')) for t in templates) or not isinstance(model.get('css'), str)):
+            raise DomainError('PROTOCOL', 'Complete templates and styling are required.')
+
+    async def _write(self, operation, envelope):
+        if not isinstance(envelope, dict) or set(envelope) != {'arguments', 'expected_state'}:
+            raise DomainError('PROTOCOL', 'A captured exact operation state is required.')
+        arguments, state = envelope['arguments'], envelope['expected_state']
+        if not isinstance(arguments, dict) or not isinstance(state, dict):
+            raise DomainError('PROTOCOL', 'Invalid operation envelope.')
+        if operation in ('add_note', 'update_note_fields'):
+            target = state.get('target')
+            self.validate_note_type(target.get('model') if isinstance(target, dict) else None, arguments.get('fields'))
+            if operation == 'add_note' and target['model'].get('name') != arguments.get('model_name'):
+                raise DomainError('CONFLICT', 'Captured model does not match the proposal.')
+        result = await self.dispatch(operation, arguments, state)
+        if result.get('version') != 1 or result.get('binding') != state.get('binding') or not isinstance(result.get('result'), dict):
+            raise DomainError('PROTOCOL', 'Write acknowledgement is incomplete; reconcile before retrying.')
+        return result
+
+    async def store_media(self, media):
+        return await self._write('store_media_file', media)
+
+    async def update_note(self, change):
+        return await self._write('update_note_fields', change)
+
+    async def set_suspended(self, card_ids, suspended, *, expected_state):
+        self._ids(card_ids)
+        if not card_ids or type(suspended) is not bool:
+            raise DomainError('PROTOCOL', 'Explicit card identities and suspension state required.')
+        return await self._write('card_suspend' if suspended else 'card_unsuspend',
+                                 {'arguments': {'card_ids':card_ids}, 'expected_state':expected_state})
+
+    async def create_notes(self, batch):
+        if not isinstance(batch, list) or not 1 <= len(batch) <= 100:
+            raise DomainError('LIMIT', 'Create between 1 and 100 individually guarded notes.')
+        results = []
+        for envelope in batch:
+            try:
+                acknowledgement = await self._write('add_note', envelope)
+                results.append({'status':'acknowledged', 'acknowledgement':acknowledgement})
+            except DomainError as exc:
+                # No automatic resend, and never discard earlier acknowledgements.
+                uncertain = exc.code in ('TRANSPORT', 'PROTOCOL', 'COMPANION')
+                results.append({'status':'uncertain' if uncertain else 'conflict', 'code':exc.code})
+                break
+        return results
