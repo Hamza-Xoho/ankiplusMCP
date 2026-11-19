@@ -63,9 +63,9 @@ class Store:
         resolved = raw.resolve()
         roots = self.source_roots or ()
         if not roots:
-            raise DomainError('SOURCE', 'No readable source roots are configured.', 'Launch with --source-root <directory> or set ANKIPLUS_SOURCE_ROOTS.')
+            raise DomainError('SOURCE', 'No readable source roots are configured.', 'Confirm readable folders in preferences; --source-root seeds a new setup only.')
         if not any(resolved.is_relative_to(root) for root in roots):
-            raise DomainError('SOURCE', 'Source is outside configured readable roots.', 'Launch with --source-root for the intended directory.')
+            raise DomainError('SOURCE', 'Source is outside configured readable roots.', 'Confirm the intended folder in preferences; --source-root seeds a new setup only.')
         if not resolved.is_file() or resolved.stat().st_size > MAX_FILE:
             raise DomainError('SOURCE', 'Source missing or larger than 64 MiB.')
         return resolved

@@ -35,13 +35,15 @@ def synthetic_receipt(ticket,role):
         committed=max(r['order'] for r in fronts)+1
         for r in backs:r['order']+=2
     else:committed=None
-    report=f'# Review Report — anki-{role}\n\n## Note fibroblast — PASS\n'
-    if role=='student':report+='**Attempt:** Fibroblasts → right\n'
-    report+='\n## Summary\n**Verdict:** PASS\n**Stats:** notes=1, pass=1\n'
+    report=f'# Review Report — anki-{role}\n'
+    for draft_id in ticket['draft_ids']:
+        report+=f'\n## Note {draft_id} — PASS\n'
+        if role=='student':report+='**Attempt:** synthetic answer → right\n'
+    report+=f'\n## Summary\n**Verdict:** PASS\n**Stats:** notes={len(ticket["draft_ids"])}, pass={len(ticket["draft_ids"])}\n'
     return dict(ticket_id=ticket['ticket_id'],role=role,agent_id=agent,author_agent_id='LOCAL-SYNTHETIC-author',
         model='claude-sonnet-5-5',effort='high' if role=='maintainer' else 'medium',
         launch={'max_turns':14 if role=='maintainer' else 6,'tools':ticket['tools'],'omit_author_context':True},
-        reads=reads,attempts_committed_at=committed,attempts={i:'Fibroblasts' for i in ticket['tile_ids']} if role=='student' else {},report=report)
+        reads=reads,attempts_committed_at=committed,attempts={i:'synthetic answer' for i in ticket['tile_ids']} if role=='student' else {},report=report)
 
 
 async def main(package_name):
@@ -174,6 +176,29 @@ async def main(package_name):
                         assert (await adapter.read_notes([nid]))[0].fields['Back']=='Fibroblasts <img src="synthetic-product.png">'
                         media=await adapter.read_media('synthetic-product.png')
                         assert media['sha256']==hashlib.sha256((root/'update.png').read_bytes()).hexdigest()
+                    # The normal saved Basic profile also supports a mixed run
+                    # containing canonical native IO. Both use their actual
+                    # captured models and real generated card identities.
+                    mixed_w=await call('create_workspace',{'mode':'lecture','text':'# Histology\nA synthetic diagram identifies the nucleus.'})
+                    mixed_workspace=mixed_w['id'];mixed_job=await call('extract_source',{'workspace':mixed_workspace})
+                    for _ in range(300):
+                        mixed_state=await call('get_job',{'workspace':mixed_workspace,'job_id':mixed_job['id']})
+                        if mixed_state['status'] not in ('queued','running'):break
+                        await asyncio.sleep(.02)
+                    assert mixed_state['status']=='completed'
+                    mixed_asset=await call('import_image',{'workspace':mixed_workspace,'path':str(root/'update.png')})
+                    mixed_cards=[{'id':'mixedbasic','kind':'basic','notetype':'Basic','fields':{'Front':'What does this synthetic diagram identify?','Back':'Nucleus'},'deck':'Default','tags':['#AnkiPlus::Mixed'],'source_ref':[1]},
+                        {'id':'diagram','kind':'io','notetype':'Image Occlusion','fields':{'Occlusion':'{{c1::image-occlusion:rect:left=.1:top=.1:width=.2:height=.2:oi=1}}','Image':'<img src="mixed-native.png">','Header':'Synthetic nucleus','Back Extra':'','Comments':''},'deck':'Default','tags':['#AnkiPlus::Mixed'],'source_ref':[1],'media':[{'path':mixed_asset['artifact'],'filename':'mixed-native.png'}]}]
+                    await call('save_cards',{'workspace':mixed_workspace,'cards':mixed_cards,'expected_revision':0})
+                    mixed_run=await call('start_student_run',{'workspace':mixed_workspace,'pages':[1]})
+                    mixed_hash=service.store.get(mixed_workspace)['source']['sha256']
+                    await call('record_run_coverage',{'run_id':mixed_run['id'],'query':'nucleus','decisions':[
+                        {'concept_id':row['id'],'draft_id':row['id'],'disposition':'propose_create','source_refs':[{'source_hash':mixed_hash,'page':1,'quote':'A synthetic diagram identifies the nucleus.'}]} for row in mixed_cards]})
+                    mixed_p=await passing_quality(mixed_run['id'],await call('stage_run',{'run_id':mixed_run['id']}))
+                    await call('authorize_run',{'run_id':mixed_run['id'],'proposal_digest':mixed_p['digest']})
+                    dispatch_run=mixed_run['id'];dispatch_digest=mixed_p['digest']
+                    mixed_result=await call('apply_run',{'run_id':mixed_run['id'],'proposal_digest':mixed_p['digest']})
+                    assert mixed_result['counts']['notes_created']==2 and mixed_result['counts']['cards_generated']==2,mixed_result
                     # Fault injection loses a real accepted acknowledgement, then
                     # restarts the primary stores. The child still owns real Anki.
                     manifest=await call('get_workspace',{'workspace':workspace})
@@ -210,7 +235,7 @@ async def main(package_name):
                         replayed=await Coordinator(fresh).apply(third_id,third_p['digest'])
                         assert replayed['counts']['uncertain_operations']==1
                         assert len(dispatches)==sent_before_restart
-                        async with connection() as adapter:assert len(await adapter.search_notes('tag:#AnkiPlus::*'))==2
+                        async with connection() as adapter:assert len(await adapter.search_notes('tag:#AnkiPlus::*'))==4
                     finally:fresh.close()
                     # Actual OCR and local inert Chromium helpers in the same
                     # installed package, still with no runtime network or mounts.
@@ -228,7 +253,7 @@ async def main(package_name):
                     assert ocr['status']=='completed' and ocr['result']['region_count']>0,ocr
                     print(json.dumps({'status':'passed','synthetic_only':True,'quality_execution':'SIGNED SYNTHETIC FIXTURE, NOT REVIEWER ACCEPTANCE',
                         'primary':importlib.metadata.version('ankiplusmcp'),'companion_archive_sha256':hashlib.sha256(Path('/artifact/companion.ankiaddon').read_bytes()).hexdigest(),'anki':importlib.metadata.version('anki'),
-                        'package':package_name,'verified_note_id':nid,'verified_card_id':cid,'intent_before_every_send':True,'conditional_dispatches':dispatches,'counts':result['counts'],'restart_uncertain':True,'notes_updated':update_result['counts']['notes_updated'],'cards_unsuspended':reuse_result['counts']['cards_unsuspended'],'media_verified':True,'ocr_regions':ocr['result']['region_count'],'calls':calls},indent=2))
+                        'package':package_name,'verified_note_id':nid,'verified_card_id':cid,'intent_before_every_send':True,'conditional_dispatches':dispatches,'counts':result['counts'],'mixed_basic_native_io_notes':mixed_result['counts']['notes_created'],'restart_uncertain':True,'notes_updated':update_result['counts']['notes_updated'],'cards_unsuspended':reuse_result['counts']['cards_unsuspended'],'media_verified':True,'ocr_regions':ocr['result']['region_count'],'calls':calls},indent=2))
         finally:
             service.close()
 

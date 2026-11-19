@@ -323,7 +323,7 @@ class Coordinator(Application,RunPreferences,SourceConflicts):
                         raise DomainError('CARD','The coverage decision needs an existing local draft.')
                     if action=='propose_create':
                         if card['action']!='create' or card['note_id'] is not None: raise DomainError('UPDATE','Existing notes are protected; explicitly choose an update.')
-                        if card['notetype']!=inputs['config']['note_type']:raise DomainError('CONFIG','Draft note type differs from the saved card profile.')
+                        if card['notetype']!=inputs['config']['note_type'] and not (card['kind']=='io' and card['notetype']=='Image Occlusion'):raise DomainError('CONFIG','Draft note type differs from the saved card profile.')
                         op='add_note';args={'deck_name':card['deck'],'model_name':card['notetype'],'fields':card['fields'],'tags':card['tags']}
                     elif action=='explicit_update':
                         if card['action']!='update' or d['chosen_note_ids']!=[card['note_id']]: raise DomainError('UPDATE','Explicit update must name exactly its selected note.')
@@ -341,18 +341,38 @@ class Coordinator(Application,RunPreferences,SourceConflicts):
                                 raise DomainError('CONFLICT','Existing note content or card ownership changed since coverage; refresh the match.')
                     if op in ('add_note','update_note_fields'):
                         adapter.validate_note_type(state['target']['model'],args['fields'])
-                        review_cards.append({**card,'model':state['target']['model']})
+                        from .quality_models import captured_kind
+                        model=state['target']['model'];kind=captured_kind(model,args['fields'])
+                        if op=='add_note' and kind!=card['kind']:
+                            findings.append({'code':'MODEL_KIND','severity':'blocker','card_id':card['id'],
+                                'message':'Draft kind differs from the actual note type semantics; edit or exclude this draft before approval.'})
+                        review_cards.append({**card,'model':model,'kind':kind,'notetype':model['name'],
+                            'tags':card['tags'] if op=='add_note' else state['target']['tags']})
                     else:
                         for target in state['target']:
                             fields=target['fields']
                             ident=(d.get('draft_id') or d['concept_id']) if len(state['target'])==1 else 'existing-'+sha({'concept':d['concept_id'],'nid':target['id']})[:24]
+                            from .quality_models import captured_kind
                             review_cards.append({'id':ident,'fields':fields,'model':target['model'],'tags':target['tags'],
-                                'kind':'cloze' if any('{{c' in v for v in fields.values()) else 'basic','notetype':target['model']['name'],
+                                'kind':captured_kind(target['model'],fields),'notetype':target['model']['name'],
                                 'note_id':target['id'],'action':'reuse','media':[]})
                     item={'id':sha({'concept':d['concept_id'],'operation':op,'arguments':args,'state':state})[:32],
                           'concept_id':d['concept_id'],'draft_id':d.get('draft_id'),'operation':op,'arguments':args,
                           'expected_state':state,'tier':card['tier'] if card else None,'source_refs':d['source_refs']}
-                    operations.append(item)
+                    if op=='card_unsuspend':
+                        # Partition at staging, never rewrite authorized arguments
+                        # at send time. The unchanged group runs first and cannot
+                        # invalidate the complete state for the one changed group.
+                        queues={c['id']:c['queue'] for n in state['target'] for c in n['cards']}
+                        groups=[[cid for cid in args['card_ids'] if (queues[cid]==-1)==suspended] for suspended in (False,True)]
+                        for group in groups:
+                            if not group:continue
+                            one={'card_ids':group};single=await adapter.operation_state(op,one)
+                            if single['target']!=[n for n in state['target'] if any(c['id'] in group for c in n['cards'])] or any(state['media'].get(k)!=v for k,v in single['media'].items()):
+                                raise DomainError('CONFLICT','Selected card state changed while staging.')
+                            operations.append({**item,'id':sha({'concept':d['concept_id'],'operation':op,'arguments':one,'state':single})[:32],
+                                'arguments':one,'expected_state':single})
+                    else:operations.append(item)
             if len({c['id'] for c in review_cards})!=len(review_cards):raise DomainError('COVERAGE','A draft cannot have multiple competing write decisions.')
             content={'inputs':inputs,'operations':operations,'findings':findings}
             content_digest=sha(content)

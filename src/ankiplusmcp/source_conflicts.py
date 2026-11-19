@@ -11,11 +11,10 @@ from .store import DomainError
 
 def source_key(decision,workspace=None):
     if hasattr(decision,'model_dump'):decision=decision.model_dump()
-    refs=[]
-    for r in decision['source_refs']:
-        refs.append({'source_hash':r['source_hash'],'page':r['page'],'quote':' '.join((r.get('quote') or '').split())})
-    hashes=sorted({hashlib.sha256(_encoded(r)).hexdigest() for r in refs})
-    return hashlib.sha256(_encoded({'concept_id':decision['concept_id'],'references':hashes,**({'workspace':workspace} if not refs else {})})).hexdigest()
+    hashes=sorted({r['source_hash'] for r in decision['source_refs']})
+    # Citations locate evidence; changing its page or shortening a quotation
+    # cannot discharge an unresolved contradiction about this concept/source.
+    return hashlib.sha256(_encoded({'concept_id':decision['concept_id'],'sources':hashes,**({'workspace':workspace} if not hashes else {})})).hexdigest()
 
 
 class SourceConflicts:
@@ -25,7 +24,10 @@ class SourceConflicts:
         for projection in catalog.changed:
             for event in projection.snapshot.events:
                 if event.kind=='source_contradiction':
-                    p=event.payload;pending[p['token']]=p['source_key']
+                    p=event.payload
+                    # Fold retained events using their original evidence, without
+                    # rewriting history or depending on the historical key format.
+                    pending[p['token']]=source_key(p,projection.snapshot.workspace)
                 elif event.kind=='source_contradiction_resolved':resolved.update(event.payload['tokens'])
         return {d['concept_id'] if isinstance(d,dict) else d.concept_id:
                 sorted(token for token,key in pending.items() if key==source_key(d,workspace) and token not in resolved)

@@ -136,6 +136,48 @@ def test_failed_sdk_connection_clears_busy_state_and_announces_recovery():
     run(exercise())
 
 
+def test_unsaved_existing_switch_and_visible_run_identity(workflow):
+    import inspect,json
+    from playwright.async_api import async_playwright,expect
+    from ankiplusmcp.review_app import html
+    from ankiplusmcp.doctor import require_browser
+    from cards.render import launch_options
+    from test_coordinator import existing
+    c,s,e,r,d=workflow;existing(workflow);run(c.stage(r.id));api=API(s)
+    options=launch_options(require_browser('auto'))
+    async def exercise():
+        async def call(name,args):
+            value=getattr(api,name)(**{'run_id':r.id,**args})
+            if inspect.isawaitable(value):value=await value
+            return {'structuredContent':value,'content':[{'type':'text','text':json.dumps(value)}]}
+        async with async_playwright() as pw:
+            browser=await pw.chromium.launch(**options)
+            try:
+                page=await browser.new_page(viewport={'width':390,'height':1000})
+                await page.route('**/*',lambda route:route.abort());await page.expose_function('hostCall',call)
+                await page.set_content('''<iframe title="Review" style="width:100%;height:2000px;border:0"></iframe><script>
+                window.addEventListener('message',async e=>{const f=document.querySelector('iframe');if(e.source!==f.contentWindow)return;const q=e.data;const send=m=>f.contentWindow.postMessage({jsonrpc:'2.0',...m},'*');
+                if(q.method==='ui/initialize')send({id:q.id,result:{protocolVersion:q.params.protocolVersion,hostInfo:{name:'SYNTHETIC',version:'1'},hostCapabilities:{serverTools:{}},hostContext:{theme:'light'}}});
+                else if(q.method==='ui/notifications/initialized')send({method:'ui/notifications/tool-result',params:await hostCall('open_run_review',{})});
+                else if(q.method==='tools/call')send({id:q.id,result:await hostCall(q.params.name,q.params.arguments)});});</script>''')
+                await page.locator('iframe').evaluate('(frame,html)=>frame.srcdoc=html',html());frame=page.frame_locator('iframe')
+                await expect(frame.get_by_role('button',name='Save decision',exact=True)).to_be_enabled()
+                await frame.get_by_label('Back for fibroblast').fill('Preserve this unsaved answer')
+                await expect(frame.get_by_label('Existing note',exact=True)).to_be_disabled()
+                await expect(frame.get_by_label('Back for fibroblast')).to_have_value('Preserve this unsaved answer')
+                await frame.get_by_role('button',name='Reload saved review',exact=True).click()
+                await expect(frame.get_by_label('Existing note',exact=True)).to_be_enabled()
+                await expect(frame.locator('#run-identity')).to_contain_text(r.id)
+                await expect(frame.locator('#run-identity')).to_contain_text('pasted.txt')
+                assert await frame.locator('body').evaluate('b=>b.scrollWidth<=innerWidth')
+                output=__import__('pathlib').Path('.artifacts/review-ui');output.mkdir(exist_ok=True,parents=True)
+                await frame.locator('main').screenshot(path=str(output/'final-fixed-mobile.png'))
+                await page.set_viewport_size({'width':1120,'height':1000})
+                await frame.locator('main').screenshot(path=str(output/'final-fixed-desktop.png'))
+            finally:await browser.close()
+    run(exercise())
+
+
 def test_sdk_approval_preserves_unsaved_choices_and_reports_pending_work(workflow):
     import inspect,json
     from playwright.async_api import async_playwright,expect

@@ -42,7 +42,9 @@ def serve(argv):
                 collection_path=args.anki_collection_path,token_file=args.companion_token_file)
         except ValueError as exc: parser.error(str(exc))
     configured=settings.configured_source_roots(args.source_root,os.environ)
-    if configured: service.store.set_source_roots(*configured)
+    # Registration flags seed an unconfirmed setup. Persisted confirmed choices
+    # (including an empty/revoked list) survive the same launch command on restart.
+    if configured and service.store.source_roots_origin!='preferences':service.store.set_source_roots(*configured)
     try: create_server(service).run(transport='stdio')
     finally: service.close()
     return 0

@@ -241,14 +241,14 @@ media must be imported from the source mount, not arbitrary host paths.
 
 Upstream attribution and MIT terms are retained in [LICENSE](LICENSE).
 
-## Student-workflow refactor in this checkout
+## Student-workflow product in this checkout
 
-This development branch adds source evidence, partial draft edits and separate local history commands. It is not the completed first-release workflow: Desktop interactive review, the verified Anki companion coordinator and onboarding completion still require their compatibility and acceptance work.
+The connected durable run path is described in [student workflow](docs/refactor/student-workflow.md). It connects source evidence, scoped companion reads, review, quality evidence, exact authorization, guarded application, recovery and verified onboarding. Actual Mac embedding, prescribed reviewer controls and private acceptance remain separate gates.
 
 - `get_source_evidence` resolves a source hash, physical page/section and optional quotation against stored extraction. It returns the exact source substring, distinguishes printed PDF labels from physical page numbers and labels OCR text. It does not establish factual accuracy.
 - `patch_cards` merges supplied note fields into selected draft IDs, preserves untouched drafts, rejects stale revisions and avoids resending the full set for one correction. It never writes to Anki.
 - `list_jobs` rediscovers job IDs with bounded summaries. Workspaces now have labels and activity timestamps; old unknown dates stay unknown.
-- Coverage decision records preserve source passages, collection snapshot IDs and actual card-vs-note identities. Supplied collection evidence remains explicitly caller-supplied until a live adapter verifies it.
+- Coverage decision records preserve source passages, collection snapshot IDs and actual card-vs-note identities. The student-run adapter obtains verified scoped companion readback; legacy supplied collection evidence retains caller-supplied provenance.
 
 Inspect or export run history separately from card review:
 
@@ -260,13 +260,13 @@ Inspect or export run history separately from card review:
 .venv/bin/python -m ankiplusmcp history import-legacy WORKSPACE_ID --workspace-root /absolute/data --from /absolute/legacy-workspace --json
 ```
 
-Exports do not overwrite existing files, and legacy import does not modify the original workspace or invent verification. The new run/configuration/guide libraries are building blocks; installing this branch alone does not automatically wrap every existing workflow in a run record or finish onboarding. The guide writer preserves its personal-notes section and refuses to overwrite other user edits.
+Exports do not overwrite existing files, and legacy import does not modify the original workspace or invent verification. The student workflow uses durable run/configuration/guide stores. Legacy mechanical helpers remain explicit offline utilities; installing this branch alone does not complete verified onboarding. The guide writer preserves its personal-notes section and refuses to overwrite other user edits.
 
 See [the approved design](docs/superpowers/specs/2026-11-18-student-workflows-design.md), [implementation plan](docs/superpowers/plans/2026-11-18-student-workflows.md) and [verification checkpoint](docs/refactor/implementation-checkpoint.md). To use this checkout through the launcher, set `ANKIPLUSMCP_PY_SPEC` as documented above; the released version tag does not contain unpushed branch changes.
 
-### Pre-macOS refactor investigation
+### Historical pre-macOS refactor investigation
 
-The source catalog, artifact publisher, authoritative run discovery and shared coverage batches are internal refactors; they do not establish Desktop or release compatibility. Run the disposable synthetic rehearsal with `.venv/bin/python scripts/smoke-premacos.py --output .artifacts/premacos/smoke.json` (fresh output only). It uses real extraction, OCR and Chromium with zero Anki operations. See [local evidence](docs/refactor/premacos-readiness.md) and the [ordered Mac test packet](docs/refactor/macos-test-packet.md). Independent host reviewers, companion integration, onboarding and private-quality acceptance remain outstanding.
+The source catalog, artifact publisher, authoritative run discovery and shared coverage batches are internal refactors; they do not establish Desktop or release compatibility. Run the disposable synthetic rehearsal with `.venv/bin/python scripts/smoke-premacos.py --output .artifacts/premacos/smoke.json` (fresh output only). It uses real extraction, OCR and Chromium with zero Anki operations. See [local evidence](docs/refactor/premacos-readiness.md) and the [ordered Mac test packet](docs/refactor/macos-test-packet.md). That rehearsal predates the connected product. Current installed companion/coordinator/onboarding acceptance uses `tests/isolated/compose.yaml`; prescribed host reviewers and private/Mac acceptance remain gates in [the current packet](docs/refactor/macos-acceptance.md).
 
 For a local test build, set `ANKIPLUSMCP_NPX_REF` to its launcher `.tgz` and `ANKIPLUSMCP_PY_SPEC` to its absolute wheel path before `init`. Local launcher paths become absolute `file:` references. Init records the Python override and resolved uv executable in the host registration, so restarted Desktop does not depend on the installer's shell PATH. `ANKIPLUSMCP_UV` explicitly selects a nonstandard uv location. Only these runtime dependencies are persisted, not the full shell environment.
 

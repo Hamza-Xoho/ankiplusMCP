@@ -60,7 +60,7 @@ def launch_options(browser):
     return {'executable_path': browser}
 
 
-def _render(build, prepared, selected, browser='chromium'):
+def _render(build, prepared, selected, browser='chromium', limits=None):
     try:
         from playwright.sync_api import sync_playwright, Error
     except ImportError as exc:
@@ -75,6 +75,7 @@ def _render(build, prepared, selected, browser='chromium'):
                 try:
                     context.route('**/*', lambda route: route.abort())
                     browser_page = context.pages[0] if context.pages else context.new_page()
+                    pixels=0
                     for nid, documents in prepared:
                         if nid not in selected:
                             continue
@@ -86,6 +87,11 @@ def _render(build, prepared, selected, browser='chromium'):
                             if existing.partition('\n')[2] != document:
                                 write_text(html_path, document, 'cards render')
                             browser_page.set_content(document, wait_until='load')
+                            if limits:
+                                width,height=browser_page.evaluate('()=>[Math.max(innerWidth,document.documentElement.scrollWidth),Math.max(innerHeight,document.documentElement.scrollHeight)]')
+                                pixels+=min(width,limits['width'])*height
+                                if width>limits['width'] or height>limits['height'] or pixels>limits['pixels']:
+                                    raise CardsError('E50','render dimensions exceed production quality limits','narrow/resize the selected content before review')
                             browser_page.screenshot(path=str(png_path), full_page=True, animations='disabled')
                             # Full-page Chromium screenshots include horizontal overflow. A phone
                             # shows only the 390 px viewport; crop that overflow without changing CSS.
@@ -126,7 +132,7 @@ def _tile_sheets(build, sheets, prepared, selected):
             artifact_meta(build, str(path.relative_to(build.root)))
 
 
-def render_rows(rows, out_dir, *, css=None, per_sheet=8, browser='chromium'):
+def render_rows(rows, out_dir, *, css=None, per_sheet=8, browser='chromium', limits=None):
     build = Build(out_dir)
     if per_sheet < 1:
         raise CardsError('E50', 'per-sheet: line 1 field value must be positive', 'use --per-sheet 8')
@@ -143,7 +149,8 @@ def render_rows(rows, out_dir, *, css=None, per_sheet=8, browser='chromium'):
         raise CardsError('E50', 'rows: line 1 field id duplicated', 'use unique note ids')
     build.path('renders/cards').mkdir(parents=True, exist_ok=True)
     build.path('renders/sheets').mkdir(parents=True, exist_ok=True)
-    _render(build, prepared, set(ids), browser)
+    if limits:_render(build, prepared, set(ids), browser, limits)
+    else:_render(build, prepared, set(ids), browser)
     sheets = _sheet_plan(build, ids, per_sheet)
     _tile_sheets(build, sheets, prepared, set(ids))
     write_json(build.path('renders/sheets.json'), {'sheets': sheets}, 'cards render')

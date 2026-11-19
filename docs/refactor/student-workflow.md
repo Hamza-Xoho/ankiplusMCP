@@ -13,8 +13,8 @@ own and premade decks without mutations. `propose_student_setup` shows complete
 choices, plain preference differences and the data folder. Explicitly confirm even
 when keeping defaults. `confirm_preferences` saves lasting choices; separate
 propose/confirm_run_preferences affect only the named run. Source-folder revocation
-also revokes runtime access. On restart saved roots apply unless explicit launch
-roots override them. Unrelated host settings and guide personal notes are retained.
+also revokes runtime access. On restart confirmed roots remain authoritative, including an empty list;
+registration flags/environment seed unconfirmed setup only. Unrelated host settings and guide personal notes are retained.
 
 Required milestones are explicit preferences, durable storage readback, actual
 companion/model checks, observed installed App interaction/reconnect, actual
@@ -28,7 +28,8 @@ concept IDs, local draft IDs and EvidenceRef passages. Search wraps the query in
 selected decks and the generated tag namespace; previously verified generated
 identities are also reread. Overflow refuses rather than claiming complete hits.
 Semantic coverage remains a host judgement. Uncertainty defaults to pending;
-source contradictions persist across matching reruns until explicit resolution.
+source contradictions persist for the same concept/source version across citation edits,
+pages and reruns until explicit resolution.
 
 Stage captures exact requests, profile/runtime binding, targets, full fields,
 models/templates/CSS, card backend state, source, media bytes, relevant effective
@@ -126,3 +127,20 @@ does not establish either capability. The importer cannot cure this, and no
 additional exploratory reviewer launch is part of Linux implementation. Actual
 prescribed reviewers, embedding, private fixtures, production note types and real
 Mac lifecycle/collection behavior remain acceptance gates. Do not weaken them.
+
+## Supported rendering and bounded operations
+
+The ordinary saved card profile can share a run with canonical native Image
+Occlusion. Existing/update reviews use actual model semantics and retained note
+tags. Native IO uses fractional rectangle masks; unsupported variants refuse.
+CSS-loaded resources (including inline/import/escaped forms) refuse before a
+dispatchable companion state or a quality render. Supply supported image fields
+instead; absent assets never become an accepted empty background.
+
+Quality preflight counts full cloze/template expansion and packet files before
+allocation. Source packet limit is 250 files/128 MiB; expanded HTML/media and
+image dimensions have additional bounds. Actual Chromium layout is bounded before
+screenshot allocation (390px wide, 12,000px height per side, 24 million aggregate
+pixels). Narrow or resize selections when refused; no silent sample replaces the
+complete selected review. Suspension requests are partitioned at staging so
+already-active cards are readback-unchanged, never counted as newly unsuspended.

@@ -108,10 +108,10 @@ class Application:
                 if await adapter.collection_identity()!=p.binding:
                     return self._outcome(run_id,item,'conflict',code='COLLECTION_CHANGED')
                 current=await adapter.operation_state(item['operation'],item['arguments'])
+                if item['operation'] in ('card_suspend','card_unsuspend'):
+                    verified=await self._verify(adapter,{**item,'binding':p.binding},None)
+                    if verified is not None:return self._outcome(run_id,item,'unchanged',**verified)
                 if current!=item['expected_state']:
-                    if item['operation'] in ('card_suspend','card_unsuspend'):
-                        verified=await self._verify(adapter,{**item,'binding':p.binding},None)
-                        if verified is not None:return self._outcome(run_id,item,'unchanged',**verified)
                     return self._outcome(run_id,item,'conflict',code='TARGET_CHANGED')
             except DomainError as exc:
                 return self._outcome(run_id,item,'failed',code=exc.code,delivery='not_sent')
@@ -149,8 +149,16 @@ class Application:
         fields=item['arguments']['fields']
         if state['target']!=[result.get('readback_state')] or any(state['media'].get(k)!=v for k,v in item['expected_state']['media'].items()) or any(n['id'] not in result['note_ids'] or n['fields']!=fields for n in state['target']):
             self._outcome(run_id,dict(id=opid,operation='card_suspend'),'conflict',code='GENERATED_CARDS_CHANGED');return
-        child={**item,'id':opid,'operation':'card_suspend','arguments':args,'expected_state':state,'tier':None}
-        await self._send(run_id,p,adapter,child)
+        queues={c['id']:c['queue'] for n in state['target'] for c in n['cards']}
+        unchanged=[cid for cid in args['card_ids'] if queues[cid]==-1]
+        changed=[cid for cid in args['card_ids'] if queues[cid]!=-1]
+        for ids in (unchanged,changed):
+            if not ids:continue
+            one={'card_ids':ids};single=await adapter.operation_state('card_suspend',one)
+            if single['target']!=state['target'] or single['media']!=state['media']:
+                self._outcome(run_id,dict(id=opid,operation='card_suspend'),'conflict',code='GENERATED_CARDS_CHANGED');return
+            child={**item,'id':opid+('-unchanged' if ids==unchanged and changed else ''),'operation':'card_suspend','arguments':one,'expected_state':single,'tier':None}
+            await self._send(run_id,p,adapter,child)
 
     def _summary(self,run_id,proposal=None):
         intents,acks,results=self._journal(run_id)

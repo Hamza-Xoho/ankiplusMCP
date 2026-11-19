@@ -78,11 +78,13 @@ class QualityGate:
                 blobs['drafts.json']=_encoded({'cards':p.review_cards,'decisions':p.decisions})
                 blobs['source-evidence.json']=_encoded({'selection':p.source,'evidence':inputs['evidence'],'coverage':inputs['coverage']})
                 pages=sorted({e['page'] for e in inputs['evidence'] if e['location_kind']=='pdf_page'})
+                self._preflight(p,len(blobs)+len(pages))
                 for page_number in pages:
                     asset=self.c.s.get_page_image(workspace,page_number)
                     blobs[f'source-page-{page_number}.png']=self.c.s.image_bytes(workspace,asset['artifact'])
             if len(blobs)>250 or sum(len(v) for v in blobs.values())>128*1024*1024:
                 raise DomainError('LIMIT','Narrow the quality packet source selection; no evidence was silently omitted.')
+            self._preflight(p,len(blobs))
             ticket_id=uuid4().hex;path=self._packet(run_id,ticket_id);path.mkdir(parents=True)
             sheets=self._render(p,path,workspace)
             tile_ids=[]
@@ -103,6 +105,43 @@ class QualityGate:
             self.c.event(run_id,'quality_issued',ticket)
             return ticket
 
+    def _preflight(self,proposal,file_count):
+        """Count the full expansion before allocating HTML, masks or packet dirs."""
+        from cards.render.templates import CLOZE
+        rows=0;html_bytes=0
+        for card in proposal.review_cards:
+            model=card['model'];fields=card['fields']
+            numbers={int(m[1]) for v in fields.values() for m in CLOZE.finditer(v)}
+            count=(len(numbers) if card['kind'] in ('cloze','io') else 1)*(1 if card['kind']=='io' else len(model['tmpls']))
+            rows+=count
+            size=sum(len(v.encode()) for v in fields.values())+len(model['css'].encode())+sum(len(t[k].encode()) for t in model['tmpls'] for k in ('qfmt','afmt'))
+            html_bytes+=size*max(count,1)
+            if size>2*1024*1024 or html_bytes>24*1024*1024 or file_count+2*((rows+7)//8)>250:
+                raise DomainError('LIMIT','Narrow the quality selection before rendering; full card expansion exceeds packet limits.')
+        from PIL import Image
+        import io,base64
+        pixels=0;media_bytes=0
+        embedded=[]
+        for card in proposal.review_cards:
+            for text in card['fields'].values():
+                embedded.extend(re.findall(r'data:image/(?:png|jpeg|gif|webp);base64,([a-z0-9+/=]+)',text,re.I))
+        images=[]
+        for media in proposal.media.values():
+            path=self.c.s.store.path(self.c.runs.read(proposal.run_id).workspace,media['path'])
+            media_bytes+=path.stat().st_size;images.append(path)
+        if html_bytes+media_bytes*rows*2>64*1024*1024:
+            raise DomainError('LIMIT','Narrow the quality selection; inlined media expansion exceeds rendering limits.')
+        for encoded in embedded:
+            try:images.append(io.BytesIO(base64.b64decode(encoded,validate=True)))
+            except ValueError:raise DomainError('UNSUPPORTED','Embedded quality image bytes are invalid.') from None
+        for image_source in images:
+            try:
+                with Image.open(image_source) as image:
+                    count=image.width*image.height;pixels+=count
+                    if count>4_000_000 or pixels>24_000_000:raise DomainError('LIMIT','Narrow/resize quality media before allocating images.')
+            except Image.DecompressionBombError:raise DomainError('LIMIT','Quality image dimensions exceed safe allocation limits.') from None
+            except (OSError,ValueError):raise DomainError('UNSUPPORTED','Quality media must be a supported readable image.') from None
+
     def _render(self,proposal,path,workspace):
         from cards.render import render_rows
         from cards.render.templates import fill,page,CLOZE
@@ -112,6 +151,9 @@ class QualityGate:
         media={name:str(self.c.s.store.path(workspace,m['path'])) for name,m in proposal.media.items()}
         for card in proposal.review_cards:
             model=card['model'];fields=card['fields'];kind=card['kind']
+            from .quality_models import refuse_css_dependencies,refuse_markup_dependencies
+            refuse_css_dependencies(model['css'])
+            for markup in list(fields.values())+[t[k] for t in model['tmpls'] for k in ('qfmt','afmt')]:refuse_markup_dependencies(markup)
             from html.parser import HTMLParser
             from urllib.parse import unquote
             class References(HTMLParser):
@@ -143,7 +185,8 @@ class QualityGate:
                 if '</style' in model['css'].lower():raise DomainError('UNSUPPORTED','This note type contains unsupported embedded style markup.')
                 css='<style>'+model['css']+'</style>'
                 rows.append({'id':card['id']+'_c'+str(ordinal),'question':css+clean(question),'answer':css+clean(answer)})
-        return render_rows(rows,path/'renders',css='',browser=require_browser(self.c.s.browser))
+        return render_rows(rows,path/'renders',css='',browser=require_browser(self.c.s.browser),
+            limits={'width':390,'height':12000,'pixels':24_000_000})
 
     def release(self,run_id,content_digest,ticket_id,attempts):
         with self.c.lock(run_id):
