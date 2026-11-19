@@ -1,4 +1,4 @@
-"""Composition root; no model calls and no Anki client."""
+"""Composition root for local helpers; explicit companion factory is supplied by the launcher."""
 from .publication import ArtifactPublisher
 from .source_catalog import SourceCatalog
 from .store import Store
@@ -15,6 +15,10 @@ class Service(Sources, Artifacts, Cards, Review, Payloads):
     def __init__(self, root, source_roots, profile=None, browser='auto'):
         self.companion_connection = None
         self.store = Store(root, source_roots)
+        if source_roots is None and (self.store.root/'.student-workflows/configuration/current.json').exists():
+            from .configuration import ConfigStore
+            saved,pointer=ConfigStore(self.store.root/'.student-workflows')._current()
+            if pointer.get('change_id'):self.store.set_source_roots(saved.source_roots,'preferences')
         self._launch_profile = profile or PROFILES['default']
         self.browser = browser
         self.jobs = Jobs(self.store)

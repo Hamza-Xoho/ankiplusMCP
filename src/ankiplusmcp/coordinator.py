@@ -247,7 +247,8 @@ class Coordinator(Application,RunPreferences,SourceConflicts):
         from cards.review.packets import TEMPLATES
         policy={str(path.relative_to(TEMPLATES)):digest(path) for role in ('maintainer','student') for path in (TEMPLATES/role).glob('*.md')}
         policy['house-style.md']=digest(TEMPLATES/'house-style.md')
-        return {'quality_policy':policy,'source':run.selection.model_dump(),'config':{k:getattr(config,k) for k in CONFIG_DEPENDENCIES},'saved_config':{k:getattr(saved_config,k) for k in CONFIG_DEPENDENCIES},
+        from .review_app import html
+        return {'review_resource_sha256':hashlib.sha256(html().encode()).hexdigest(),'quality_policy':policy,'source':run.selection.model_dump(),'config':{k:getattr(config,k) for k in CONFIG_DEPENDENCIES},'saved_config':{k:getattr(saved_config,k) for k in CONFIG_DEPENDENCIES},
                 'cards':cards,'media':media,'decisions':decisions,'review_selection':selected,'pending_conflicts':pending,'evidence':evidence,
                 'coverage':[{k:e.payload[k] for k in ('batch_id','binding','query','notes')} for e in events]}
 

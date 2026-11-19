@@ -125,13 +125,13 @@ class Jobs:
             if self._closing:return
             self._closing=True
             futures=dict(self._futures)
+        if futures:wait(futures,timeout=timeout)
         for future,(workspace,ident) in futures.items():
             if not future.done():self.cancel(workspace,ident)
         self.pool.shutdown(wait=False,cancel_futures=True)
         for future,(workspace,ident) in futures.items():
             if future.cancelled():self._update(workspace,ident,status='cancelled',progress='cancelled during shutdown')
         with self._guard:self._shutdown_published=True
-        if futures:wait(futures,timeout=timeout)
         # A still-running native callback keeps its owner lease until its final
         # publication. Python process exit may wait for that native boundary.
         self._release_owner()

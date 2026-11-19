@@ -91,3 +91,11 @@ Actual identity binding, media content, unsuspend and live loss-of-receipt recov
 still need supported contracts and acceptance. The bounded follow-up plan retains
 these requirements and forbids guessing or weakening them. E3 forwarding remains
 unverified; both response channels stay unchanged.
+
+## Connected-product implementation dispositions
+
+The later executable continuation resolves each register ID in
+[the closure matrix](../../refactor/audit-closure.md). That matrix records fixes,
+superseded legacy behavior, measured/deferred optimizations and genuinely external
+acceptance gates individually. The earlier subset statements above remain valid
+history of those revisions, rather than claims about the finished continuation.

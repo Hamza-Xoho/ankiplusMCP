@@ -1,4 +1,4 @@
-"""Typed stdio MCP facade. Collection operations stay in the official Anki MCP."""
+"""Typed stdio facade; guarded student operations use the explicit companion adapter."""
 import base64
 from functools import wraps
 import importlib.metadata
@@ -35,7 +35,8 @@ class API:
             except importlib.metadata.PackageNotFoundError: dependencies[name]=None
         browser=doctor.resolve_browser(self.s.browser)
         return {'server':'ankiplusmcp','version':importlib.metadata.version('ankiplusmcp'),'transport':'stdio',
-                'anki_connection':'separate_host_dependency','anki_operations':False,
+                'anki_connection':'configured_companion' if self.s.companion_connection else 'separate_host_dependency',
+                'anki_operations':self.s.companion_connection is not None,'authorization_required':True,
                 'dependencies':dependencies,'tesseract_available':doctor.have('tesseract'),'chromium_available':browser is not None,'browser':browser,
                 'guidance_topics':['overview','quality','maintainer','student'],
                 'source_roots':[str(p) for p in (self.s.store.source_roots or ())],
@@ -72,7 +73,7 @@ class API:
         from .onboarding import Onboarding
         status=Onboarding(self.s).confirm_choices(change_id)
         config=status.configuration
-        if config.source_roots:self.s.store.set_source_roots([Path(p) for p in config.source_roots],'preferences')
+        self.s.store.set_source_roots([Path(p) for p in config.source_roots],'preferences')
         return {**status.model_dump(),'ready_to_apply':status.onboarding_complete}
 
     def propose_student_setup(self, choices: dict) -> dict:
@@ -92,6 +93,8 @@ class API:
         """Search complete bounded note/card coverage from an explicitly configured companion. Never mutates Anki."""
         if self.s.companion_connection is None:
             raise DomainError('UNSUPPORTED','Configure an explicit companion endpoint and intended profile/path first.')
+        from .coordinator import scoped_query
+        query=scoped_query(query,self._student_config().read())
         async with self.s.companion_connection() as adapter:
             binding=await adapter.collection_identity()
             ids=await adapter.search_notes(query)
@@ -128,7 +131,7 @@ class API:
         """Capture an immutable exact proposal and its conditional collection preconditions. Does not approve or write."""
         p=await self._coordinator().stage(run_id)
         return {'run_id':run_id,'digest':p.digest,'content_digest':p.content_digest,'operations':len(p.operations),
-                'pending':sum(d['disposition']=='pending' for d in p.decisions),'quality_required':not bool(p.quality)}
+                'pending':sum(d['disposition']=='pending' for d in p.decisions),'quality_required':bool(p.operations) and len(p.quality)!=2}
 
     def get_run_proposal(self, run_id: str, offset: Offset=0, limit: Limit=10) -> dict:
         """Read a bounded page of proposed cards, actions, source evidence and unresolved findings."""
@@ -432,7 +435,7 @@ async def resolve_roots(server, store):
 
 
 def create_server(service):
-    server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
+    server=FastMCP('ankiplusmcp', instructions='AnkiPlus student workflows with source evidence and permanent run history. Use the durable student run tools for collection application: approved-scope coverage, immutable stage, independent quality evidence, exact authorization, conditional apply and read-only reconciliation. Setup must be verified. Mechanical workspace tools remain available. Caller-supplied legacy receipts never establish verified application. Companion access requires explicit connection configuration.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
     read_only={'get_collection_choices','get_run_results','get_run_history','read_run_record','list_student_runs','read_run_review','read_run_review_field','get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):

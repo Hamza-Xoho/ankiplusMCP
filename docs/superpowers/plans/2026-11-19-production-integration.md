@@ -112,3 +112,28 @@ IDs after fields/media verification. Intent without a known identity remains
 uncertain after restart; known IDs permit bounded readback only. No create search
 can by itself manufacture provenance or trigger a resend. Tests cover these
 interfaces with real stores, source extraction and transport-only synthetic Anki.
+
+## Response, cleanup and acceptance supplements
+
+Bounded result/history tools retain exact event evidence through sequence+offset
+slices. Application responses page per-operation outcomes and expose aggregate
+counts, pending operations/decisions and exclusions. No-op runs only reread covered
+notes/cards and record unchanged/conflict; no quality/user write authorization is
+needed because this path cannot dispatch mutations. Mixed runs still require all
+normal write gates. Workspace discovery isolates damaged manifests without
+rewriting them. The history CLI discovers the actual student journal root and
+retains explicit access to historical standalone roots.
+
+Derived cleanup accepts only reproducible workspace previews and current preview
+pointer, with preview digest confirmation, active-job refusal, referenced-media
+protection and permanent deletion manifest. Native job API shutdown waits at most
+two seconds and retains the live owner lease until callbacks stop; interpreter
+exit can still wait at a native boundary. No force-kill claim is made.
+
+Combined local acceptance uses tests/isolated/compose.yaml only: no runtime mounts,
+ports or networking, nonroot/read-only/resource-limited, fresh tmpfs collections.
+The primary runs with its locked dependencies; a separate stdio child owns the
+packaged companion and disposable Anki collection. Quality and observed-host
+receipts are explicitly signed synthetic fixtures, never actual reviewer passes.
+The path covers guarded refusal, successful real-ID readback/tier suspension,
+replay, prior mappings and lost-real-acknowledgement restart without blind resend.

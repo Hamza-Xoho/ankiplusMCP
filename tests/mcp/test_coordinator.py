@@ -221,3 +221,12 @@ def test_new_coverage_replaces_older_review_target_decision(workflow):
     p=run(c.stage(r.id))
     assert p.decisions[0]['disposition']=='propose_create'
     assert p.operations[0]['operation']=='add_note'
+
+
+def test_public_collection_coverage_helper_respects_saved_scope_and_capabilities(workflow):
+    from ankiplusmcp.server import API
+    c,s,e,r,d=workflow;api=API(s)
+    run(api.search_collection_coverage('collagen'))
+    assert 'deck:"Default"' in e.queries[-1]
+    assert api.capabilities()['anki_operations'] is True
+    assert api.capabilities()['authorization_required'] is True

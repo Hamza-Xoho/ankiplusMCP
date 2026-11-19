@@ -41,6 +41,7 @@ def history_main(argv):
     parser.add_argument('action', choices=('list', 'show', 'export', 'rebuild', 'import-legacy'))
     parser.add_argument('run_id', nargs='?')
     parser.add_argument('--workspace-root', default=os.environ.get('ANKIPLUS_WORKSPACE_ROOT') or str(settings.default_workspace_root()))
+    parser.add_argument('--journal-root',help='Explicit historical standalone journal root, overriding student-root discovery.')
     parser.add_argument('--source-hash')
     parser.add_argument('--note-id', type=int)
     parser.add_argument('--card-id', type=int)
@@ -54,7 +55,10 @@ def history_main(argv):
     parser.add_argument('--json', action='store_true')
     args = parser.parse_args(argv)
     try:
-        store = RunStore(Path(args.workspace_root).expanduser())
+        root=Path(args.workspace_root).expanduser()
+        if args.journal_root:root=Path(args.journal_root).expanduser()
+        elif (root/'.student-workflows').is_dir():root=root/'.student-workflows'
+        store = RunStore(root)
         if args.action == 'list':
             result = RunIndex(store).search(RunQuery(source_hash=args.source_hash, note_id=args.note_id, card_id=args.card_id,
                 stage=args.stage, outcome=args.outcome, text=args.query, offset=args.offset, limit=args.limit))

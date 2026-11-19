@@ -143,3 +143,49 @@ def test_tier_child_failure_is_visible_in_partial_summary(workflow):
     assert result['counts']['failed_operations']==1
     assert result['counts']['cards_suspended']==0
     assert len(e.sent)==1
+
+
+def test_tier_followup_refuses_foreign_scheduling_changes_after_verified_create(workflow):
+    c,s,e,r,d=workflow;s.patch_cards(r.workspace,[{'id':'fibroblast','changes':{'tier':3}}],1)
+    p=approved(workflow);original=e.state
+    def changed(op,args):
+        if op=='card_suspend':e.cards[201]['backend_sha256']='f'*64
+        return original(op,args)
+    e.state=changed
+    result=run(c.apply(r.id,p.digest))
+    assert result['counts']['notes_created']==1
+    assert result['counts']['conflict_operations']==1
+    assert e.cards[201]['queue']==0
+    assert [op for op,_ in e.sent]==['add_note']
+
+
+def test_unsuspend_readback_does_not_confirm_foreign_note_tags(workflow):
+    from test_coordinator import existing
+    c,s,e,r,d=workflow;existing(workflow);p=approved(workflow);original=e.call_tool
+    async def changed(name,args):
+        result=await original(name,args)
+        if name=='conditional_student_operation':e.notes[101]['tags']=['FOREIGN']
+        return result
+    e.call_tool=changed
+    result=run(c.apply(r.id,p.digest))
+    assert result['counts']['cards_unsuspended']==0
+    assert result['results'][0]['status']=='uncertain'
+
+
+def test_all_covered_run_finishes_with_readback_and_no_quality_or_write_authorization(workflow):
+    from test_coordinator import existing
+    c,s,e,r,d=workflow;existing(workflow);e.cards[201]['queue']=0;d['disposition']='already_covered';covered(workflow)
+    p=run(c.stage(r.id));assert not p.operations
+    result=run(c.apply(r.id,p.digest))
+    assert result['counts']['unchanged_operations']==1
+    assert result['results'][0]['note_ids']==[101]
+    assert not e.sent
+
+
+def test_all_covered_run_records_conflict_when_note_changes_after_coverage(workflow):
+    from test_coordinator import existing
+    c,s,e,r,d=workflow;existing(workflow);e.cards[201]['queue']=0;d['disposition']='already_covered';covered(workflow)
+    p=run(c.stage(r.id));e.notes[101]['fields']['Back']='foreign'
+    result=run(c.apply(r.id,p.digest))
+    assert result['counts']['conflict_operations']==1
+    assert not e.sent

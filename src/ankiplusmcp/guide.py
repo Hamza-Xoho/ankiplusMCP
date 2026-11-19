@@ -79,7 +79,7 @@ class Guide:
 Your materials: {_inline(sources)}.
 Your relevant decks: {_inline(decks)}.
 
-AnkiPlus checks existing cards before creating gaps, so you do not study the same idea twice. You do not need a premade deck to start; your own cards become part of future coverage checks.
+AnkiPlus checks existing cards before proposing gaps to reduce the chance of studying the same idea twice. Review uncertain matches; semantic duplicate detection is not a guarantee. You do not need a premade deck to start; your own cards become part of future coverage checks.
 
 ## 2. Make your first cards
 

@@ -99,3 +99,22 @@ def test_house_style_check_uses_one_profile_snapshot(tmp_path,monkeypatch):
     monkeypatch.setattr(Service,'profile',property(changing))
     try:assert s.check_cards(w,house_style=True)['blockers']==0
     finally:s.close()
+
+
+def test_confirmed_empty_source_roots_revokes_access_and_survives_restart(tmp_path):
+    from ankiplusmcp.service import Service
+    from ankiplusmcp.server import API
+    from ankiplusmcp.store import DomainError
+    source=tmp_path/'source.md';source.write_text('Synthetic source')
+    service=Service(tmp_path/'data',[tmp_path])
+    try:
+        api=API(service);current=api.get_student_setup()['configuration']
+        diff=api.propose_preferences({'source_roots':[]},current['config_version'])
+        api.confirm_preferences(diff['id'])
+        with pytest.raises(DomainError,match='SOURCE'):service.store.source(str(source))
+        restarted=Service(tmp_path/'data',None)
+        try:
+            assert restarted.store.source_roots==()
+            assert restarted.store.source_roots_origin=='preferences'
+        finally:restarted.close()
+    finally:service.close()

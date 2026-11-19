@@ -1,32 +1,42 @@
 ---
 name: ankiplusmcp
-description: Use AnkiPlus MCP mechanical helpers for lecture extraction, OCR, image occlusions, card checks, previews, and review changes alongside the official Anki MCP.
+description: Use AnkiPlus for source-linked card creation, existing-card coverage, review, guarded application, recovery, onboarding, and permanent run history.
 ---
 
-AnkiPlus handles source material and working artifacts. The separate official
-Anki MCP reads and changes the Anki collection. Choose tools to fit the request;
-there is no required pipeline or review panel.
+Use the student's approved source selection and saved preferences. Read
+get_student_setup first when setup is incomplete; propose_student_setup shows
+choices for explicit confirmation. Include the student's own relevant decks;
+no premade deck is required. Distinguish a this-run choice from future defaults.
 
-Useful combinations:
+For collection changes, use the connected durable run:
 
-- Lecture cards: extract a source, inspect relevant slides/figures, draft cards,
-  check or preview them, then prepare payloads for Anki MCP.
-- Existing-card review: retrieve notes and note-type templates through Anki MCP,
-  save snapshots in a cards workspace, inspect previews, and consider changes.
-- Diagram cards: inspect the image, use OCR for suggested rectangles, adjust
-  labels/groups, and build an occlusion preview. OCR is assistance, not evidence
-  that every label was detected.
-- Targeted suspension/unsuspension: use the official Anki MCP directly; AnkiPlus
-  is useful only if source inspection, selection preparation or previews help.
+1. Start a run for the selected source/pages. Extract and inspect the relevant
+   text, figures and OCR labels. Draft using the unchanged house style, selection,
+   combination, tier, tag and rendering rules from get_guidance.
+2. Record approved-scope coverage with source references and semantic decisions.
+   Inspect hits; a search result alone does not prove conceptual coverage.
+   Reconcile earlier uncertain writes before proposing another create.
+3. Stage immutable proposals. Open source-linked review when review is enabled.
+   Keep, exclude, edit-new, choose-existing, defer or explicitly update a note.
+   Existing-note text is protected by default. Changes invalidate approval and
+   affected quality evidence; re-stage and rerun the required quality reviews.
+4. Prepare both independent quality packets. Preserve the prescribed models,
+   effort, tools, unchanged briefs/rubrics and cumulative turn limits. Student
+   front attempts must be committed before backs are released in the same
+   reviewer continuation. Actual host execution needs trusted verifier evidence.
+   Unsupported controls remain a gate; caller PASS assertions cannot replace it.
+5. Obtain explicit user approval of the exact proposal, or use configuration
+   authorization only when the student explicitly saved automatic processing.
+   Apply through apply_run. Read per-item results, including tier followups.
+   Confirmed notes, generated cards and suspension card IDs are different units.
+6. On interruption or unknown outcome, use reconcile_run. Keep insufficient
+   evidence uncertain. Never blindly resend creates or retry an entire batch.
+   Read history/results with continuation; exact records remain permanently saved.
 
-Preserve source terminology, qualifications and citations when drafting. The
-optional get_guidance tool provides quality/reviewer rubrics when useful.
-Mechanical checks do not establish factual accuracy.
+Use current workspace revisions for local edits and job IDs for long operations.
+Get complete field slices before editing a shortened preview. Source quotations
+are evidence, including extraction origin; OCR does not establish factual accuracy.
 
-Use explicit workspace IDs and current revisions for edits. Long operations
-return job IDs; get_job supplies results. get_image returns viewable images.
-Tool errors describe prerequisites and corrections without requiring a restart.
-
-prepare_write generates files and arguments; it does not send them to Anki.
-Pass those payloads through the official Anki MCP and record actual responses
-if a report is useful. Note IDs identify notes; suspension uses card IDs.
+Mechanical workspace helpers remain available offline. Legacy prepare_write only
+creates payloads; record_external_results retains caller-supplied provenance.
+Those receipts never authorize or establish verified student-run application.

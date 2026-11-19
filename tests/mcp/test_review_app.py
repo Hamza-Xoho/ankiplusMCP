@@ -81,6 +81,19 @@ def test_real_sdk_review_ui_edits_excludes_reconnects_and_refuses_stale_tab(work
                 await page.set_viewport_size({'width':390,'height':1000})
                 assert await frame.locator('body').evaluate('(body)=>body.scrollWidth<=innerWidth')
                 await frame.locator('main').screenshot(path=str(output/'mobile.png'))
+                await frame.get_by_role('button',name='Reload saved review',exact=True).focus()
+                await page.keyboard.press('Tab')
+                await expect(frame.get_by_role('button',name='Recheck proposal',exact=True)).to_be_focused()
+                await page.emulate_media(color_scheme='dark',reduced_motion='reduce')
+                contrast=await frame.locator('body').evaluate(r'''body=>{
+                  const rgb=value=>value.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});
+                  const luminance=value=>rgb(value).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+                  const style=getComputedStyle(body),a=luminance(style.color),b=luminance(style.backgroundColor);
+                  return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+                }''')
+                assert contrast>=4.5
+                assert await frame.locator('body').evaluate('(body)=>body.scrollWidth<=innerWidth')
+                await frame.locator('main').screenshot(path=str(output/'mobile-dark.png'))
                 assert not e.sent
             finally:await instance.close()
     run(browser())

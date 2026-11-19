@@ -5,8 +5,12 @@ Run `./scripts/check-mcp.sh`; use `python -m ankiplusmcp` for stdio.
 The npm launcher (`npx ankiplusmcp`: serve, init, doctor, setup, uninstall) is in
 `launcher/`, dependency-free; run `npm test`. Keep `package.json` and
 `pyproject.toml` on the same version. Design: `docs/superpowers/specs/2026-11-10-npx-launcher-design.md`.
-The official Anki MCP is a separate host dependency. Do not add Anki connection,
-proxy or collection mutation code. Keep the host model in control of workflows.
+The companion is a separate host dependency. The approved student-workflow design
+authorizes only the narrow adapter in src/ankiplusmcp/anki_adapter.py and explicit
+connection factory in companion_connection.py. Networking stays outside src/cards.
+Collection writes use durable Coordinator proposals, quality evidence, exact
+authorization, conditional dispatch and per-item readback; no arbitrary forwarding.
+See docs/refactor/student-workflow.md for the connected product and trust boundaries.
 Use `tests/mcp/` for new MCP tests. Frozen: the contract tests in `.codex/contract.sha256`, `.codex/`, `.agents/`
 and existing `.claude/` skills. `src/cards/` source files may change only as an
 approved plan lists (owner's decision, 2026-11-10); the `cards` CLI's output

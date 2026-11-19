@@ -1,5 +1,10 @@
 # Architecture and design rationale
 
+The current connected student product is described in
+[student-workflow.md](refactor/student-workflow.md). The CLI pipeline below is
+retained history and compatibility rationale; it does not describe Coordinator
+authorization, verified application or the production review App.
+
 This document is for people who want to change Lecture2Cards or judge whether
 its design is sound. For using it, read the [README](../README.md).
 

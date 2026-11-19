@@ -15,7 +15,7 @@ from .review import packets, apply
 from .review.apply import load_report, report_path
 from .write import plan
 from .common.errors import CardsError, Refused
-from .common.files import read_json, read_jsonl, _write
+from .common.files import read_json, read_jsonl, write_json, _write
 from .common.output import Result
 from .common.paths import Build
 
@@ -131,6 +131,15 @@ def extract_and_target(build, data, args):
         lines.append('P1: extraction cached')
     target_path = build.path('target.json')
     target_data = read_json(target_path) if target_path.is_file() else {}
+    decks=build.path('existing-decks.json')
+    if target_data.get('confident') and target_data.get('create_deck') and decks.is_file():
+        listing=read_json(decks)
+        if not isinstance(listing,list) or not all(isinstance(name,str) for name in listing):
+            raise CardsError('E31','preflight deck listing invalid','supply the actual deck names as a JSON array')
+        chosen=target.resolve_collision(target_data['deck'],listing,target_data['course'],target_data['number'],data.get('facts',{}).get('deck_has_source_tag',False))
+        if chosen!=target_data['deck']:
+            target_data.update(deck=chosen,create_deck=chosen not in listing)
+            write_json(target_path,target_data,'cards target')
     if not target_data.get('confident'):
         decks = build.path('existing-decks.json')
         if not decks.is_file():

@@ -23,3 +23,5 @@ workspaces/
 node_modules/
 *.tgz
 .claude/worktrees/
+.student-workflows/
+.quality-verifier.key

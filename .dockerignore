@@ -19,3 +19,5 @@ reference folders
 .artifacts
 
 **/node_modules
+.student-workflows
+**/.quality-verifier.key

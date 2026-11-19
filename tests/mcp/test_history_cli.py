@@ -42,3 +42,15 @@ def test_history_errors_are_structured_without_starting_stdio(tmp_path):
     assert result.returncode == 2
     assert json.loads(result.stdout)['error']['code'] == 'RUN'
     assert 'Traceback' not in result.stderr
+
+
+def test_history_cli_finds_actual_student_coordinator_runs(tmp_path):
+    from ankiplusmcp.service import Service
+    from ankiplusmcp.coordinator import Coordinator
+    s=Service(tmp_path,[tmp_path])
+    try:
+        workspace=s.store.create('cards')['id'];run=Coordinator(s).start(workspace)
+        result=cli(tmp_path,'list','--json')
+        assert result.returncode==0,result.stderr
+        assert any(row['id']==run.id for row in json.loads(result.stdout)['runs'])
+    finally:s.close()

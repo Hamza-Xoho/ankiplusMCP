@@ -42,6 +42,11 @@ class Onboarding:
         choice=checks.get('preferences',{})
         values={k:getattr(config,k) for k in self.c.config.MUTABLE}
         if choice.get('status')=='passed' and choice.get('choice_values')!=values:checks['preferences']={'status':'required','code':'PREFERENCES_CHANGED'}
+        review=checks.get('interactive_review',{})
+        if review.get('status')=='passed':
+            from .review_app import html
+            if review.get('resource_sha256')!=hashlib.sha256(html().encode()).hexdigest():
+                checks['interactive_review']={'status':'required','code':'REVIEW_RESOURCE_CHANGED'}
         connection=checks.get('connection',{})
         if connection.get('status')=='passed' and connection.get('preferences')!={'profile':config.profile,'note_type':config.note_type}:
             checks['connection']={'status':'required','code':'PREFERENCES_CHANGED'}
@@ -141,7 +146,7 @@ class Onboarding:
                 if evidence['observations']!={'initialize':True,'tool_call':True,'readback':True,'reconnect':True}:raise DomainError('SETUP','Production App interaction and reconnect have not all been observed.')
                 sessions=[e for e in self.c.runs.read(evidence['run_id']).events if e.kind=='review_session' and e.payload['token_sha256']==evidence['session_token_sha256']]
                 if not sessions:raise DomainError('SETUP','The observed App session does not belong to this run.')
-                result={'status':'passed','evidence_sha256':sha(evidence),'runtime':evidence['runtime']}
+                result={'status':'passed','evidence_sha256':sha(evidence),'runtime':evidence['runtime'],'resource_sha256':evidence['resource_sha256']}
             else:
                 if evidence:raise DomainError('SETUP','The tailored guide is written and checked directly.')
                 guide=self.refresh_guide()

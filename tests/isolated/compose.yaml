@@ -1,0 +1,24 @@
+name: ankiplus-student-isolated
+services:
+  acceptance:
+    image: ankiplus-student-isolated:${ANKIPLUS_REVISION:-uncommitted-dirty}
+    build:
+      context: ../..
+      dockerfile: tests/isolated/Dockerfile
+      args:
+        SOURCE_REVISION: ${ANKIPLUS_REVISION:-uncommitted-dirty}
+        COMPANION_REVISION: ${COMPANION_REVISION:-uncommitted-dirty}
+    network_mode: none
+    read_only: true
+    user: '1000:1000'
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 1.5
+    mem_limit: 2048m
+    pids_limit: 192
+    shm_size: 128m
+    tmpfs:
+      - /tmp:rw,nosuid,size=512m,uid=1000,gid=1000
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '2'}

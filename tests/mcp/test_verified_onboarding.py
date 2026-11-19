@@ -145,3 +145,15 @@ def test_setup_can_inspect_own_decks_without_requiring_a_premade_deck(workflow):
     assert result['decks'][0]['eligible_for_scope'] is True
     assert result['decks'][1]['eligible_for_scope'] is False
     assert not e.sent
+
+
+def test_changed_installed_review_resource_requires_observed_setup_again(workflow,monkeypatch):
+    from test_reconciliation import approved
+    from ankiplusmcp.onboarding import Onboarding
+    import ankiplusmcp.review_app as resource
+    c,s,e,r,d=workflow;approved(workflow)
+    original=resource.html()
+    monkeypatch.setattr(resource,'html',lambda:original+'<!-- changed installed resource -->')
+    status=Onboarding(s).status()
+    assert not status.onboarding_complete
+    assert 'interactive_review' in status.remaining_checks

@@ -72,15 +72,23 @@ class ReviewSession:
             findings=[f for f in p.findings if f.get('card_id') in (None,d.get('draft_id'))]+rows
             from .run_responses import page
             shown,_=page(findings,0,10,budget=6000)
-            items.append({**d,'fields':display,'truncated_fields':truncated,
+            items.append({**{k:v for k,v in d.items() if k!='source_refs'},'fields':display,'truncated_fields':truncated,
                 'selected':inputs['review_selection'].get(d['concept_id'],True),'source_evidence':refs,
                 'existing_notes':existing,'more_existing_candidates':len(d['candidate_note_ids'])>3,
                 'findings':shown,'findings_total':len(findings),'more_findings':len(shown)<len(findings)})
+        ready=False
+        if current:
+            try:
+                from .quality import QualityGate,validate_quality
+                self.c._current(run_id,p.digest,quality=True)
+                validate_quality(p);QualityGate(self.c).validate_proposal(p)
+                ready=True
+            except DomainError:pass
         return {'run_id':run_id,'workspace':run.workspace,'session_token':session_token,'digest':version,
             'proposal_digest':p.digest,'content_digest':p.content_digest,'items':items,'offset':offset,'total':len(inputs['decisions']),
             'next_offset':offset+1 if offset+1<len(inputs['decisions']) else None,'needs_revalidation':not current,
-            'quality_status':'ready' if current and len(p.quality)==2 else 'required','source':p.source,
-            'can_authorize':current and len(p.quality)==2 and not any(f.get('severity')=='blocker' for f in p.findings)}
+            'quality_status':'ready' if ready else 'required','source':p.source,
+            'can_authorize':ready and not any(f.get('severity')=='blocker' for f in p.findings)}
 
     def field(self,run_id,token,concept_id,name,note_id=None,offset=0,limit=4000):
         self._validate_session(run_id,token)
@@ -88,6 +96,8 @@ class ReviewSession:
         p,inputs,version,current=self._view(run_id)
         d=next((d for d in inputs['decisions'] if d['concept_id']==concept_id),None)
         if d is None:raise DomainError('REVIEW','Unknown review item.')
+        if note_id is None and d['disposition'] in ('already_covered','propose_unsuspend') and len(d['chosen_note_ids'])==1:
+            note_id=d['chosen_note_ids'][0]
         if note_id is not None:
             if note_id not in d['candidate_note_ids']:raise DomainError('REVIEW','Existing note is outside this review item.')
             fields=next(n['fields'] for b in reversed(inputs['coverage']) for n in b['notes'] if n['note_id']==note_id)

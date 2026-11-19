@@ -1,20 +1,29 @@
 # AnkiPlus MCP
 
-`ankiplusmcp` gives a model independent mechanical helpers for lecture extraction,
-OCR, image occlusions, card validation, previews, review changes and Anki payload
-preparation. The model chooses which tools to use. There is no mandatory pipeline,
-review panel or model provider.
+This branch connects student onboarding, source evidence, approved collection
+coverage, source-linked review, quality enforcement, exact authorization,
+conditional application, readback, recovery and permanent history. Offline
+extraction, OCR, image occlusions, card checks and previews remain available.
 
-**The official Anki MCP is a separate companion dependency.** Configure both in
-your AI host. AnkiPlus never connects to Anki, proxies that server, or performs
-collection operations. The model passes snapshots and prepared payloads between
-the servers. Source-only and supplied-card operations also work offline.
+Collection access uses an explicitly configured loopback companion. Every write
+requires a current proposal, required independent quality evidence and exact user
+or saved-policy authorization. Real Mac acceptance and prescribed reviewer runtime
+controls remain gates; Linux synthetic checks do not establish those capabilities.
+See [student workflow](docs/refactor/student-workflow.md),
+[local acceptance](docs/refactor/acceptance.md) and the
+[Mac packet](docs/refactor/macos-acceptance.md).
+
+This development branch has not been released or deployed. The version 0.3.0
+installation examples below describe the historical mechanical-helper package.
+Use the revision-pinned checkout and local launcher in the Mac packet for this
+branch. Do not infer Windows, alternate-host or production note-type support from
+packaging tests.
 
 Derived from [Lecture2Cards](https://github.com/Hamza-Xoho/Lecture2Cards). Its
 `cards` CLI remains available with its original gate and semantics. See the
 [legacy guide](docs/legacy-lecture2cards.md) and [capability mapping](docs/capabilities.md).
 
-## Install
+## Historical 0.3.0 installation
 
 You need [Node](https://nodejs.org) 18 or newer and [uv](https://docs.astral.sh/uv/).
 uv fetches Python and the server's dependencies for you. macOS and Linux are

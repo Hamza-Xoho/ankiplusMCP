@@ -102,6 +102,10 @@ class Store:
 
     def get(self, ident):
         manifest = self.read_json(ident, 'workspace.json')
+        if (not isinstance(manifest,dict) or manifest.get('id')!=ident
+            or manifest.get('mode') not in ('lecture','cards') or type(manifest.get('revision')) is not int
+            or manifest['revision']<0 or not isinstance(manifest.get('source') or {},dict)):
+            raise DomainError('WORKSPACE','Workspace manifest is damaged; original retained for recovery.')
         manifest.setdefault('created', None)
         manifest.setdefault('updated', None)
         source = manifest.get('source') or {}
@@ -137,9 +141,13 @@ class Store:
         if type(offset) is not int or offset<0 or type(limit) is not int or not 1<=limit<=100:
             raise DomainError('LIMIT','Use a nonnegative offset and a limit between 1 and 100.')
         ids = sorted(p.name for p in self.root.iterdir() if p.is_dir() and not p.is_symlink() and (p/'workspace.json').is_file())
-        items=sorted((self.get(ident) for ident in ids),key=lambda item:(item.get('updated') or item.get('created') or '', item['id']),reverse=True)
+        items=[];errors=[]
+        for ident in ids:
+            try:items.append(self.get(ident))
+            except (DomainError,OSError,ValueError,TypeError):errors.append({'id':ident,'code':'WORKSPACE_RECORD','message':'Cannot read workspace; original retained.'})
+        items.sort(key=lambda item:(item.get('updated') or item.get('created') or '',item['id']),reverse=True)
         end=offset+limit
-        return {'workspaces':items[offset:end], 'total':len(items), 'next_offset':end if end<len(items) else None}
+        return {'workspaces':items[offset:end], 'total':len(items), 'next_offset':end if end<max(len(items),len(errors)) else None,**({'errors':errors[offset:end],'error_total':len(errors)} if errors else {})}
 
     def import_file(self, ident, filename):
         source = self.source(filename)

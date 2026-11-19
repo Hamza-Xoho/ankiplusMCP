@@ -90,3 +90,15 @@ def test_source_contradiction_can_only_close_through_explicit_bound_resolution(w
     second=c.start(r.workspace,[1]);d['source_disagreement']=False;run(c.coverage(second.id,'collagen',[d]))
     assert run(c.stage(second.id)).decisions[0]['disposition']=='propose_create'
     assert not e.sent
+
+
+def test_complete_main_field_slice_for_existing_card_uses_the_displayed_note(workflow):
+    from test_coordinator import existing
+    from ankiplusmcp.review_session import ReviewSession
+    c,s,e,r,d=workflow;existing(workflow)
+    e.notes[101]['fields']['Back']='existing answer '*800
+    covered(workflow)
+    sessions=ReviewSession(c);page=run(sessions.open(r.id))
+    value=sessions.field(r.id,page['session_token'],'fibroblast','Back')
+    assert value['text'].startswith('existing answer existing answer')
+    assert value['next_offset']==4000

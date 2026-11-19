@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-19T19:03:25.109734+00:00",
+  "title": "Design System: AnkiPlus student review",
+  "extensions": {
+    "breakpoints": [
+      {
+        "name": "stacked-review",
+        "value": "640px"
+      }
+    ],
+    "motion": [
+      {
+        "name": "pressed-button",
+        "value": "translateY(1px)",
+        "purpose": "Immediate press feedback; removed under reduced-motion preference."
+      }
+    ],
+    "focus": {
+      "outline": "3px solid var(--focus)",
+      "offset": "3px"
+    },
+    "sourceFiles": [
+      "review-ui/review.template.html",
+      "review-ui/review.js"
+    ],
+    "provenance": "Extracted from the implemented review surface; no generated or sourced shipping raster assets."
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "Compare a proposal with its evidence before changing a collection.",
+    "overview": "A restrained source-linked editor with explicit local save, current quality evidence and exact approval.",
+    "keyCharacteristics": [
+      "Native labelled controls",
+      "Persistent local decisions",
+      "Source and coverage alongside text",
+      "Separate quality and authorization"
+    ],
+    "rules": [
+      {
+        "name": "Inert evidence",
+        "body": "Source and card text are displayed as text, not executed HTML.",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Retain visible keyboard focus and honest saved/error state.",
+      "Stack editor before evidence at phone widths."
+    ],
+    "donts": [
+      "Do not invent reviewer evidence or flatten uncertain partial application.",
+      "Do not hide the explicit existing-note update decision."
+    ]
+  }
+}

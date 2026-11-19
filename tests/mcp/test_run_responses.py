@@ -34,3 +34,18 @@ def test_proposal_previews_are_bounded_and_exact_event_is_slice_readable(workflo
         if offset is None:break
     exact=json.loads(''.join(chunks))
     assert exact['payload']['proposal']['cards'][0]['fields']==p.cards[0]['fields']
+
+
+def test_review_evidence_previews_do_not_repeat_full_long_quotes(workflow):
+    from ankiplusmcp.review_session import ReviewSession
+    c,s,e,r,d=workflow
+    from test_sources import wait
+    quote='Fibroblast collagen '*60
+    w=s.store.create('lecture',text='# Cells\n'+quote)['id']
+    wait(s,w,s.extract_source(w))
+    s.save_cards(w,[s._cards(r.workspace)[0]],0)
+    new=c.start(w,[1]);source=s.store.get(w)['source']['sha256']
+    d['source_refs']=[{'source_hash':source,'page':1,'quote':quote} for _ in range(20)]
+    run(c.coverage(new.id,'collagen',[d]));run(c.stage(new.id));page=run(ReviewSession(c).open(new.id))
+    assert len(json.dumps(page))<18000
+    assert len(page['items'][0]['source_evidence'])==20
