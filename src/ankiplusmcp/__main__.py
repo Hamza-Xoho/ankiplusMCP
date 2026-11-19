@@ -19,7 +19,15 @@ def serve(argv):
     parser.add_argument('--profile',default=None,help='Built-in profile: '+', '.join(sorted(settings.PROFILES))+'. Overrides the config file.')
     parser.add_argument('--config',default=None,help='Config TOML with profile, note_type, tag_root, browser. Defaults to ANKIPLUS_CONFIG, then the per-user config directory.')
     parser.add_argument('--browser',default=None,help='Browser for card previews: auto (default), chromium, chrome, or the absolute path of a browser program. Overrides the config file.')
+    parser.add_argument('--companion-url',help='Explicit local companion HTTP endpoint; no automatic connection.')
+    parser.add_argument('--anki-profile',help='Intended Anki profile name, distinct from the card style profile.')
+    parser.add_argument('--anki-collection-path',help='Intended absolute collection path reported by the companion.')
+    parser.add_argument('--companion-token-file',help='Optional private file containing the existing companion bearer key.')
     args=parser.parse_args(argv)
+    if args.companion_url and not (args.anki_profile and args.anki_collection_path):
+        parser.error('--companion-url requires --anki-profile and --anki-collection-path')
+    if not args.companion_url and any((args.anki_profile,args.anki_collection_path,args.companion_token_file)):
+        parser.error('Companion options require --companion-url')
     config=Path(args.config) if args.config else None
     try:
         profile=settings.load_profile(args.profile,config,os.environ)
@@ -27,6 +35,12 @@ def serve(argv):
     except ValueError as exc: parser.error(str(exc))
     logging.basicConfig(level=logging.WARNING)
     service=Service(args.workspace_root,None,profile,browser)
+    if args.companion_url:
+        from .companion_connection import CompanionConnection
+        try:
+            service.companion_connection=CompanionConnection(args.companion_url,profile=args.anki_profile,
+                collection_path=args.anki_collection_path,token_file=args.companion_token_file)
+        except ValueError as exc: parser.error(str(exc))
     configured=settings.configured_source_roots(args.source_root,os.environ)
     if configured: service.store.set_source_roots(*configured)
     try: create_server(service).run(transport='stdio')

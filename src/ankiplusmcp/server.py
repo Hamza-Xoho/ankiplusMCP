@@ -44,6 +44,51 @@ class API:
                 'long_operations':'extract_source, ocr_image and render_cards return jobs; use get_job.',
                 'missing_dependency_remedy':doctor.FIXES}
 
+    def _student_config(self):
+        from .configuration import ConfigStore
+        return ConfigStore(self.s.store.root / '.student-workflows')
+
+    def get_student_setup(self) -> dict:
+        """Resume saved student preferences and show remaining verified setup requirements."""
+        config=self._student_config().read()
+        return {'configuration':config.model_dump(),
+                'remaining_checks':['companion connection and intended profile',
+                    'production interactive review','independent quality reviewer runtime','full workflow acceptance'],
+                'ready_to_apply':False}
+
+    def propose_preferences(self, changes: dict, expected_version: Annotated[int,Field(ge=1)]) -> dict:
+        """Show a lasting preference diff without saving it. Run-only choices need no saved change."""
+        return self._student_config().propose(changes,expected_version).model_dump()
+
+    def confirm_preferences(self, change_id: str) -> dict:
+        """Explicitly save a shown preference change and refresh the tailored guide, preserving personal notes."""
+        from .guide import Guide, VerifiedCapabilities
+        config=self._student_config().confirm(change_id)
+        guide=Guide.write(config,VerifiedCapabilities())
+        return {**self.get_student_setup(),'guide_path':str(guide)}
+
+    async def search_collection_coverage(self, query: Annotated[str,Field(min_length=1,max_length=2000)]) -> dict:
+        """Search complete bounded note/card coverage from an explicitly configured companion. Never mutates Anki."""
+        if self.s.companion_connection is None:
+            raise DomainError('UNSUPPORTED','Configure an explicit companion endpoint and intended profile/path first.')
+        async with self.s.companion_connection() as adapter:
+            binding=await adapter.collection_identity()
+            ids=await adapter.search_notes(query)
+            notes=await adapter.read_notes(ids)
+            card_ids=[c for n in notes for c in n.card_ids]
+            cards=[]
+            for offset in range(0,len(card_ids),100):
+                cards.extend(await adapter.read_cards(card_ids[offset:offset+100]))
+            by_id={c['id']:c for c in cards}
+            for note in notes:
+                if any(by_id[c]['nid']!=note.note_id for c in note.card_ids):
+                    raise DomainError('CONFLICT','Card ownership changed during coverage search.')
+                note.suspended_card_ids=[c for c in note.card_ids if by_id[c]['queue']==-1]
+            if await adapter.collection_identity()!=binding:
+                raise DomainError('CONFLICT','Companion session changed during coverage search.')
+        return {'binding':binding,'query':query,'notes':[n.model_dump() for n in notes],
+                'evidence_origin':'companion_readback','semantic_completeness_verified':False}
+
     def get_guidance(self, topic: Literal['overview','quality','maintainer','student']='overview') -> dict:
         """Read optional workflow examples or card/reviewer guidance. No prescribed tool sequence."""
         from cards.review.packets import TEMPLATES
@@ -232,7 +277,7 @@ async def resolve_roots(server, store):
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
-    read_only={'capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
+    read_only={'get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):
         if name.startswith('_'): continue
         def wrap(method):
@@ -240,7 +285,8 @@ def create_server(service):
             async def invoke(**kwargs):
                 try:
                     if service.store.source_roots is None: await resolve_roots(server,service.store)
-                    result=await anyio.to_thread.run_sync(lambda: method(**kwargs))
+                    result=(await method(**kwargs) if inspect.iscoroutinefunction(method)
+                            else await anyio.to_thread.run_sync(lambda: method(**kwargs)))
                     if isinstance(result,CallToolResult): return result
                     encoded=json.dumps(result,ensure_ascii=False,allow_nan=False)
                     if len(encoded)>64000:

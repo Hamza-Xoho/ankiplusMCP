@@ -262,3 +262,27 @@ The source catalog, artifact publisher, authoritative run discovery and shared c
 For a local test build, set `ANKIPLUSMCP_NPX_REF` to its launcher `.tgz` and `ANKIPLUSMCP_PY_SPEC` to its absolute wheel path before `init`. Local launcher paths become absolute `file:` references. Init records the Python override and resolved uv executable in the host registration, so restarted Desktop does not depend on the installer's shell PATH. `ANKIPLUSMCP_UV` explicitly selects a nonstandard uv location. Only these runtime dependencies are persisted, not the full shell environment.
 
 Uninstall preserves entries edited since installation. It exits **3** and retains their install records when removal is incomplete; restore the recorded entry before retrying, or resolve that entry explicitly. Backups are retained. See [Mac lifecycle evidence and retesting](docs/refactor/macos-host-lifecycle.md).
+
+### Experimental student workflow integration
+
+The `refactor/student-workflows` branch is not a finished student product.
+`get_student_setup`, `propose_preferences` and `confirm_preferences` expose saved
+preferences through MCP. Confirmation regenerates `Start here — AnkiPlus.md`
+under `<workspace-root>/.student-workflows/`, preserving its personal notes.
+The completion flag stays false while required setup/quality/UI gates are open.
+
+Collection coverage reads are opt-in. Configure the existing local companion
+with `serve --companion-url http://127.0.0.1:<port>/mcp --anki-profile <name>
+--anki-collection-path <absolute-path>`. An optional `--companion-token-file`
+reads the existing bearer key from a private file; never paste keys into command
+arguments or source. These options do not install, launch or reconfigure Anki.
+The default remains disconnected. `search_collection_coverage` retrieves at most
+500 complete notes, with actual note/card ownership and suspended card IDs.
+Overflow, missing records, excerpts and changed sessions refuse the read.
+Retrieved coverage is not proof of semantic matching or an authorization to write.
+
+The narrow adapter requires the versioned companion conditional-operation
+extension for guarded state reads/writes. Installed older companions fail closed.
+No coordinator apply/reconciliation tools or production review UI are provided
+by this checkpoint. The container remains network-disabled and cannot connect to
+a host companion; these optional native connection flags do not change that.
