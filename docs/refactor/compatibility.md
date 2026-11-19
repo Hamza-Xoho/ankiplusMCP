@@ -224,3 +224,36 @@ packet. The [next evidence packet](macos-reviewer-companion-gates.md) audits
 existing transcripts, traces the actual companion without collection calls and
 requires a bounded, exact operation list before separate mutation authorization.
 Zero Anki operations remain reported; production integration is still gated.
+
+## Received Mac artifacts and bounded follow-up
+
+Seven attachments now supply the original attribution/proposal, cumulative summary,
+22-tool metadata, isolated-profile results with cleanup, shareable variants and
+checksum manifest. All four original evidence hashes match; nine repository
+originals and both reviewer instruction-body hashes also match. Raw execution
+transcripts/live handshake are not attached. See
+[assessment](macos-evidence-assessment.md) for independently checked versus supplied
+claims and [follow-up plan](../superpowers/plans/2026-11-19-compatibility-follow-up.md)
+for exact scope, candidate mappings, tests and remaining blockers.
+
+Reported per-request metadata resolves reviewer execution to Sonnet 5.5/high and
+medium. Turn limits, instruction/template preservation and all-sheet inspection
+are supported by the supplied audit; unexplained selection metadata does not alone
+justify another reviewer run. Blind recall remains unproved because of conflicting
+parallel/staged image instructions. A disposable staged experiment needs an
+explicit protocol decision, preserving frozen files and quality requirements.
+
+The attribution chain points to Anki MCP Server add-on 0.41.1 from installed source;
+reported FastMCP streamable HTTP/Bearer auth is a candidate transport, not yet a
+frozen wire contract. Original protocol tool names/serverInfo, robust collection
+identity and media byte-readback mechanisms remain absent. Formal outputSchema
+absence alone need not block strict adapters when original observed results exist.
+
+The separately authorized synthetic-profile run reports stock-Cloze create/card
+resolution/suspend, update, media storage/listing and partial/duplicate behavior.
+It was followed by authorized note/card deletion and media-to-trash cleanup; empty
+decks remain. No sync reported. Those later operations supersede the earlier
+zero-operation total only for that subsequent run. This Linux assessment makes no
+Anki calls. Unsuspend, E/F, production ColdRecall type/quality and production
+approval/recovery remain unpassed. Equal numeric note/card IDs are retained by
+typed fields, not rejected merely for equality. Both response channels stay intact.

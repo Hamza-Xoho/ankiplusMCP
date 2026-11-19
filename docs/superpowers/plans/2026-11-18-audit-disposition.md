@@ -78,3 +78,16 @@ skill-folder failure, remain ignored in the original plan's workspace. No privat
 Mac transcripts, credentials or collection data were committed. The current
 whole-branch engineering review is distinct from the still-required independent
 product-quality reviewers and real-platform acceptance.
+
+## Received Mac evidence assessment
+
+The later seven-file intake is assessed in
+`docs/refactor/macos-evidence-assessment.md`; hashes and copied originals remain
+ignored. D6 advances from names/configuration alone to supplied per-request
+model/effort, packet-input and template/image inspection evidence, with local
+source-hash checks. Blind recall and representative quality remain unresolved.
+D1–D5 are not closed by stock-Cloze synthetic operations or caller-journal recovery.
+Actual identity binding, media content, unsuspend and live loss-of-receipt recovery
+still need supported contracts and acceptance. The bounded follow-up plan retains
+these requirements and forbids guessing or weakening them. E3 forwarding remains
+unverified; both response channels stay unchanged.

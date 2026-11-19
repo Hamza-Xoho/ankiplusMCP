@@ -157,3 +157,26 @@ documents; runtime source is commit `510c1e4`. Image inspection and complete
 build/smoke logs are retained in the same ignored workspace. Pinned-download
 retries recovered without changing requirements or isolation. No public service,
 profile switch, Anki endpoint or collection operation was introduced.
+
+## Evidence intake after f795b56
+
+The owner supplied seven Mac artifacts. Four original checksums, nine repository
+originals and two reviewer bodies match locally; raw transcripts/live handshake
+are not attached. Received bytes and audit receipt are retained only in ignored
+`.artifacts/compatibility-received/20261119/`. No runtime code, public schema,
+frozen file, card-quality instruction or original artifact was modified.
+
+The [new assessment](macos-evidence-assessment.md) advances reviewer provenance and
+stock-Cloze A–D evidence with explicit limits. The
+[follow-up plan](../superpowers/plans/2026-11-19-compatibility-follow-up.md) prepares
+read-only metadata completion, an approval-gated disposable staged-image protocol,
+local fault tests and an explicitly blocked live recovery envelope. Profile path
+alone, filename-only media readback and reconstructed schemas do not establish
+required production guarantees. No collection authorization is requested around
+unknown identity or transport operations.
+
+Checks in this intake are evidence JSON/hash/source-template validation, link and
+whitespace checks, and privacy checks. Historical runtime results remain 634/25
+(public-CI tests/skips), 401/1 (MCP tests/skip), 42 launcher tests and the recorded
+hardened container smoke at 510c1e4-dirty. Runtime/container suites were not rerun
+for documentation-only changes; no fresh behavioral success is claimed.

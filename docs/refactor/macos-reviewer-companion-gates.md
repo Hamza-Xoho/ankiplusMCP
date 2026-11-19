@@ -1,5 +1,14 @@
 # Close reviewer provenance and companion identity
 
+Current continuation: the owner has supplied seven evidence attachments. Their
+four original evidence hashes and nine repository-original hashes were checked
+locally. See [assessment](macos-evidence-assessment.md) and the
+[bounded follow-up plan](../superpowers/plans/2026-11-19-compatibility-follow-up.md).
+Reuse the now-reported reviewer settings/template/image inspection and stock-Cloze
+A–D results; execute only missing checks. The older instructions below remain a
+historical checklist, not a request to rerun passed probes. No current collection
+execution authorization follows from receiving the evidence.
+
 Use the existing Local Code session on the existing probe folder, Worktree off.
 Read-only investigation and evidence preparation only: zero Anki collection tool
 calls, no profile changes, no reviewer reruns unless a specific missing check is
