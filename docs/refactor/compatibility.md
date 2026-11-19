@@ -34,3 +34,36 @@ Documentation can change; record the installed host/add-on versions in actual ac
 ## Gate
 
 No Mac/Desktop session or isolated live Anki is available on this development host. Consequently the combined local interactive UI + independent reviewer + companion path is unverified. Do not freeze production transport/UI implementation from documentation alone, expose Anki publicly as a workaround, or replace the quality process silently. Durable records and other transport-independent work may proceed without claiming this gate passed.
+
+## Disposable probe verification checkpoint
+
+The preparation and evidence-limit fixes are `87391d7` and `93bb57a`.
+Post-fix local verification: **624 passed, 25 existing skips** in public-CI mode;
+`check-mcp.sh` **391 passed, one existing skip**, frozen hashes and **42 hooks**
+intact, wheel/version/privacy checks passed, CLI golden **IDENTICAL (66 files,
+14 commands)**. Launcher **42/42** and `uv lock --check` passed. Nine focused probe
+tests passed after failed-first steps. Full generated SDK build, rendered reviewer
+packets, stdio/resource checks and local iframe emulator passed with zero Anki
+operations. Actual tool-schema arrays measured 1,668 / 30,142 UTF-8 bytes for the
+four-tool probe / 36-tool product; tokens and host loading remain unmeasured.
+
+The single fresh checkpoint reviewer found a misleading blind-recall expectation:
+fronts and backs are exposed together by the preserved packet. A failed regression
+now passes with explicit unverified/blocked metadata and corrected evaluator
+instructions. The underlying frozen quality-process limitation remains unresolved;
+no other material finding or deferred minor was reported. Actual Mac/runtime and
+companion results were outside this review. Rulings/costs and the Mac procedure are
+in the linked experiment packet. Raw logs and hashes remain ignored under
+`.artifacts/compatibility-local/`; generated runs retain their actual dirty-source
+provenance. This checkpoint changes no production module or public MCP contract.
+
+Rootless Compose configuration, image build and the hardened real OCR/render smoke
+also passed. Image `ankiplusmcp:87391d7-dirty` retains the actual build provenance;
+its manifest is `sha256:3d37c8d5ea01100c0f5d99d0535b9da3c767b21ea552b3c0544119f1737237ce`.
+The smoke ran as UID 1000 with read-only root, network disabled, dropped
+capabilities, no-new-privileges and the existing resource limits. It reported
+zero Anki operations. The first build failed fetching pinned `cffi==2.1.1`;
+that same version downloaded successfully in a separate bounded diagnostic and
+the unchanged build then passed. Both attempts are retained; no lock or runtime
+restriction was relaxed. The probe itself is a developer experiment, excluded
+from the production container/package.
