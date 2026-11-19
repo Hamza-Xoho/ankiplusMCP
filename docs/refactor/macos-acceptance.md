@@ -1,3 +1,8 @@
+> Runtime follow-up: use [macos-ocr-retest.md](macos-ocr-retest.md) for the
+> repaired51c8e36 packet and narrow source-only retest, including Desktop workflow
+> setup and required local-wheel extras. The6e9bcf3 packet below is preserved
+> historical evidence; do not use its bare-wheel override for the new retest.
+
 # Revision-pinned Mac acceptance packet
 
 Status: **Linux/T3 implementation and local acceptance complete.** This packet

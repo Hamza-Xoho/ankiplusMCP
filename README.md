@@ -1,5 +1,11 @@
 # AnkiPlus MCP
 
+Mac OCR/doctor follow-up: [new pinned packet and narrow retest](docs/refactor/macos-ocr-retest.md).
+For local wheels, request `ankiplusmcp[all] @ file:///absolute/wheel.whl`; a bare
+wheel omits Playwright. Desktop workflow is available through
+`get_guidance(topic="workflow")`; connector registration does not install a
+Desktop filesystem skill.
+
 This branch connects student onboarding, source evidence, approved collection
 coverage, source-linked review, quality enforcement, exact authorization,
 conditional application, readback, recovery and permanent history. Offline
