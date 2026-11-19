@@ -1,6 +1,10 @@
 # Desktop compatibility investigation
 
-Status: documentation and repository inspection only, 2026-11-18. This is not a completed compatibility spike or a claim of tested Desktop support.
+Status, 2026-11-19: the user reported passing Mac installer/stdio/lifecycle tests;
+see [host evidence](macos-host-lifecycle.md). The remaining UI/reviewer/companion
+experiment now has a [reproducible Desktop packet](desktop-compatibility-experiment.md)
+and locally tested disposable probe. The combined compatibility gate remains open.
+The 2026-11-18 investigation below is retained as history, not a completed spike.
 
 ## Established locally
 
