@@ -87,7 +87,7 @@ def create_server(data_root):
             'save_sample_decisions':'Save only synthetic selections from the UI; never authorize or write Anki.'}[name],
             inputSchema=schema,
             annotations=types.ToolAnnotations(readOnlyHint=name!='save_sample_decisions',destructiveHint=False,openWorldHint=False),
-            _meta={'ui':{'resourceUri':URI,**({'visibility':['app']} if name=='save_sample_decisions' else {})}} if name in ('open_sample_review','save_sample_decisions') else None)
+            _meta={'ui/resourceUri':URI,'ui':{'resourceUri':URI,**({'visibility':['app']} if name=='save_sample_decisions' else {})}} if name in ('open_sample_review','save_sample_decisions') else None)
             for name,schema in schemas.items()]
     @server.list_resources()
     async def resources():return [types.Resource(uri=URI,name='Synthetic review',mimeType=MIME)]

@@ -59,6 +59,10 @@ route add no compatibility evidence.
 1. The agent verifies actual probe tool discovery in the fresh session and calls
    `open_sample_review`. The owner confirms whether the embedded view renders.
    Directly launching another stdio client is supplementary evidence only.
+   **If Desktop displays a widget-load error and text fallback, stop the sample
+   edit/save instructions.** Record rendering as failed on this registration,
+   inspect the selected probe's resource response/logs, and follow the diagnostic
+   continuation below. A successful opener tool call does not establish rendering.
 2. The owner changes sample-a to `Mac test edit`, unchecks sample-b and clicks
    Save once. Capture the exact widget status before Reload, including any error.
 3. The agent reads actual server state and observations. A save pass requires the
@@ -84,3 +88,50 @@ If no tested route works, report the concrete matrix and stop production UI
 implementation at Task 3's gate. Any change to the chosen experience needs an
 evidence-based decision. Keep the sample transport local stdio and existing tool
 visibility/quality rules intact.
+
+## Widget-load diagnostic continuation
+
+The owner supplied a screenshot after Desktop-owned registration/restart showing
+`Couldn't load this widget, so its result is shown as text.` The opener returned
+revision 0, but this view has no editable sample controls. Rendering failed in
+that attempt; save/reload/restart persistence cannot be exercised there. Preserve
+the earlier Code-managed rendered/IPC-failed result separately.
+
+First, the Mac agent collects the failing Desktop probe's resource-read errors
+from its own server logs and verifies `resources/list`/`resources/read` with a
+proper MCP client and bounded timeout. Save only relevant non-secret evidence:
+the expected URI, MIME type, HTML byte count/hash, and actual errors. A separate
+client success is a server check, not a host-rendering pass.
+
+The official SDK's [registerAppTool implementation](https://github.com/modelcontextprotocol/ext-apps/blob/main/src/server/index.ts)
+normalizes the modern nested resource URI and deprecated flat alias together.
+The probe initially supplied only the modern form. Its generator now supplies
+both while preserving app-only save visibility. This is a verified metadata
+compatibility correction; its relevance to this Mac loading error is unproven.
+
+The Mac agent can refresh only the existing generated `probe_server.py` from the
+latest generator's `SERVER` constant, keeping the registered path and data-root:
+
+1. Fetch the source revision identified in the handoff; inspect the generator
+   change and use that exact committed source, preserving the checkout branch.
+2. Compare the existing server hash with `experiment.json`'s original generated
+   server hash and any documented refresh evidence. If it differs unexpectedly,
+   preserve it and diagnose. If it already equals the new source, leave it alone.
+3. Back up the current generated server, then atomically write only the new
+   `SERVER` string to that same file, retaining its permissions. Preserve the
+   bundle, all registrations, data and prior logs. Record old/new hashes and
+   source revision in the host evidence; the original manifest remains history.
+4. Validate the refreshed server with the actual registration command in a
+   bounded MCP client: the opener and app-only save have matching nested/flat
+   resource URIs; save visibility remains app-only; the HTML resource is readable.
+5. Save a resume note and ask the owner for one full Desktop quit/reopen. In a
+   fresh Local Code session, inspect actual discovery/opening again. If rendering
+   fails, record that error and try the already-registered probe in a fresh **Chat**
+   conversation within Desktop. No project folder is selected in Chat. Ask there
+   to open the probe's sample review; the owner checks the view and, only if it
+   renders, performs the sample save. The Code agent subsequently verifies the
+   same data-root's state/logs.
+
+Record each surface/registration/server revision separately. Neither a metadata
+correction nor a Chat result proves a working Code view. Keep the production gate
+open until the actual combined host/reviewer/companion requirements are met.

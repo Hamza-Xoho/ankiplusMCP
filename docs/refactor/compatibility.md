@@ -108,3 +108,28 @@ backs up configurations, preserves the same server/data, removes only the owned
 project-local duplicate and tests Desktop-owned registration. There is no claim
 that changing models or repeatedly clicking Save repairs this bridge. Production
 UI/coordinator contracts remain gated; restart persistence has not passed.
+
+## Desktop-owned widget-load result
+
+The owner then supplied a screenshot after registering the probe only through
+Desktop and restarting: its tools were available and the opener returned revision
+0, but Desktop displayed an explicit widget-load error and a JSON text fallback.
+Rendering failed on that attempt; it provides no button-save or restart-persistence
+pass. Keep it distinct from the earlier Code-managed view that rendered but had
+an IPC error on Save. The new screenshot shows Haiku 5.5 / Medium; remeasure actual
+runtime versions rather than copying older environment evidence.
+
+The probe's handwritten tool metadata omitted the legacy flat resource URI alias
+that the pinned official Apps SDK 2.0.4 supplies alongside the modern nested form.
+The generator now matches that normalization, with save still app-only. Its missing
+alias was reproduced by a failing test; eleven focused tests now pass. This is a
+metadata compatibility correction, not a demonstrated fix for the Mac rendering
+failure. The retest packet includes resource/log diagnosis and an owned-file refresh
+that preserves registrations, bundle and data, then tests Code/Chat independently.
+
+Metadata-correction verification: eleven focused tests and `check-mcp.sh` passed
+(393 tests, one existing skip), with frozen hashes/42 hooks, wheel/version/privacy
+and unchanged CLI golden. The real stdio/resource check and SDK iframe emulator
+passed using the unchanged previously built UI bundle; zero Anki operations.
+The probe schema is now 1,770 UTF-8 bytes with the compatibility aliases; the
+production schema remains 30,142 bytes. This is local evidence only.

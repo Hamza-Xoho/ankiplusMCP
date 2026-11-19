@@ -63,6 +63,7 @@ def test_probe_stdio_resource_ui_metadata_and_distinct_content_channels(tmp_path
             async with ClientSession(read,write) as session:
                 await session.initialize();listed=await session.list_tools();tools={t.name:t for t in listed.tools}
                 assert tools['open_sample_review'].meta['ui']['resourceUri']=='ui://ankiplus-probe/review.html'
+                assert tools['open_sample_review'].meta['ui/resourceUri']=='ui://ankiplus-probe/review.html'
                 resource=await session.read_resource('ui://ankiplus-probe/review.html')
                 assert resource.contents[0].mimeType=='text/html;profile=mcp-app'
                 channels=await session.call_tool('observe_content_channels',{})
@@ -151,3 +152,18 @@ def test_preparation_includes_opt_in_project_mcp_registration(tmp_path):
     entry=project['mcpServers']['ankiplus-compat-probe']
     assert Path(entry['command']).is_absolute()
     assert entry['args']==[str(root/'probe_server.py'),'--data-root',str(root/'data')]
+
+
+def test_probe_matches_sdk_resource_uri_aliases_and_preserves_app_only_save(tmp_path):
+    root=Path(prepared(tmp_path)['root'])
+    module=load(root/'probe_server.py','ui_metadata_compatibility')
+    async def run():
+        server=module.create_server(root/'data')
+        from mcp.types import ListToolsRequest
+        response=await server.request_handlers[ListToolsRequest](ListToolsRequest(method='tools/list'))
+        tools={tool.name:tool for tool in response.root.tools}
+        for name in ('open_sample_review','save_sample_decisions'):
+            assert tools[name].meta['ui/resourceUri']==tools[name].meta['ui']['resourceUri']=='ui://ankiplus-probe/review.html'
+        assert tools['save_sample_decisions'].meta['ui']['visibility']==['app']
+        assert not tools['read_sample_state'].meta
+    asyncio.run(run())
