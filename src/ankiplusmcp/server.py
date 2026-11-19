@@ -81,7 +81,8 @@ class API:
                 cards.extend(await adapter.read_cards(card_ids[offset:offset+100]))
             by_id={c['id']:c for c in cards}
             for note in notes:
-                if any(by_id[c]['nid']!=note.note_id for c in note.card_ids):
+                if any(by_id[c]['nid']!=note.note_id or by_id[c]['note_fields']!=note.fields
+                        or by_id[c]['sibling_card_ids']!=sorted(note.card_ids) for c in note.card_ids):
                     raise DomainError('CONFLICT','Card ownership changed during coverage search.')
                 note.suspended_card_ids=[c for c in note.card_ids if by_id[c]['queue']==-1]
             if await adapter.collection_identity()!=binding:

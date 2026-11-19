@@ -99,7 +99,9 @@ class AnkiAdapter:
         self._ids(card_ids)
         if not card_ids: return []
         state=await self.operation_state('card_unsuspend',{'card_ids':card_ids})
-        cards=[dict(c,note_id=n['id']) for n in state['target'] for c in n['cards'] if c['id'] in card_ids]
+        cards=[dict(c,note_id=n['id'],note_fields=n['fields'],
+                    sibling_card_ids=sorted(s['id'] for s in n['cards']))
+               for n in state['target'] for c in n['cards'] if c['id'] in card_ids]
         if len(cards)!=len(card_ids) or {c['id'] for c in cards}!=set(card_ids) or any(c['nid']!=c['note_id'] for c in cards):
             raise DomainError('CONFLICT','Card ownership is incomplete or foreign.')
         return cards

@@ -31,8 +31,13 @@ class CompanionConnection:
             if not token or '\n' in token or '\r' in token:
                 raise DomainError('CONFIG','Companion credential file is invalid.')
             headers['Authorization']='Bearer '+token
-        async with httpx.AsyncClient(headers=headers,follow_redirects=False,trust_env=False,timeout=30) as client:
-            async with streamable_http_client(self.url,http_client=client) as (read,write,_):
-                async with ClientSession(read,write) as session:
-                    await session.initialize()
-                    yield AnkiAdapter(session,profile=self.profile,collection_path=self.collection_path)
+        try:
+            async with httpx.AsyncClient(headers=headers,follow_redirects=False,trust_env=False,timeout=30) as client:
+                async with streamable_http_client(self.url,http_client=client) as (read,write,_):
+                    async with ClientSession(read,write) as session:
+                        await session.initialize()
+                        yield AnkiAdapter(session,profile=self.profile,collection_path=self.collection_path)
+        except DomainError:
+            raise
+        except Exception:
+            raise DomainError('TRANSPORT','Companion connection failed; any sent operation must be reconciled before retry.') from None
