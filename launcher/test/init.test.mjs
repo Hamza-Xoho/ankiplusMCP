@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { repoRoot, runCli, tempDir } from './helpers.mjs';
+import { fakeUv, repoRoot, runCli, tempDir } from './helpers.mjs';
 import { HOSTS } from '../lib/hosts.mjs';
 
 const REF = 'github:Hamza-Xoho/ankiplusMCP#v0.3.0';
@@ -109,7 +109,7 @@ test("command hosts run the host's own command", () => {
   const r = runCli(['init', '--host', 'claude-code', '--scope', 'user', '--yes', '--no-warmup'], { PATH: `${bin}:${process.env.PATH}` }, { home, cwd: home });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'),
-    ['mcp', 'add', '--scope', 'user', '--transport', 'stdio', 'ankiplusmcp', '--', 'npx', '-y', REF, 'serve']);
+    ['mcp', 'add', '--env', 'ANKIPLUSMCP_PY_SPEC=SPEC', '--env', `ANKIPLUSMCP_UV=${fakeUv}`, '--scope', 'user', '--transport', 'stdio', 'ankiplusmcp', '--', 'npx', '-y', REF, 'serve']);
 });
 
 test('uninstall restores the original', () => {

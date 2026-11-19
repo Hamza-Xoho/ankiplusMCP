@@ -15,6 +15,7 @@ function onPath(name, env) {
 }
 
 const quote = (value) => JSON.stringify(value);
+const envArgs = (entry) => Object.entries(entry.env ?? {}).flatMap(([key, value]) => ['--env', `${key}=${value}`]);
 const shellLine = (argv) => argv.map((part) => (/^[\w@%+=:,./#-]+$/.test(part) ? part : `'${part.replaceAll("'", `'\\''`)}'`)).join(' ');
 
 /**
@@ -32,7 +33,7 @@ export const HOSTS = {
       if (scope === 'project') {
         return { kind: 'json', file: join(cwd, '.mcp.json'), keyPath: ['mcpServers', SERVER], value: { type: 'stdio', ...entry } };
       }
-      const argv = ['claude', 'mcp', 'add', '--scope', 'user', '--transport', 'stdio', SERVER, '--', entry.command, ...entry.args];
+      const argv = ['claude', 'mcp', 'add', ...envArgs(entry), '--scope', 'user', '--transport', 'stdio', SERVER, '--', entry.command, ...entry.args];
       if (!onPath('claude', env)) return { kind: 'manual', text: `Run this once the claude command is available:\n  ${shellLine(argv)}` };
       return { kind: 'command', argv, undo: ['claude', 'mcp', 'remove', '--scope', 'user', SERVER], exists: ['claude', 'mcp', 'get', SERVER] };
     },
@@ -54,9 +55,9 @@ export const HOSTS = {
     scopes: ['user'],
     detect: ({ env, homedir }) => onPath('codex', env) || existsSync(join(homedir, '.codex')),
     plan({ entry, env }) {
-      const argv = ['codex', 'mcp', 'add', SERVER, '--', entry.command, ...entry.args];
+      const argv = ['codex', 'mcp', 'add', SERVER, ...envArgs(entry), '--', entry.command, ...entry.args];
       if (!onPath('codex', env)) {
-        return { kind: 'manual', text: `Add this to ~/.codex/config.toml:\n\n[mcp_servers.${SERVER}]\ncommand = ${quote(entry.command)}\nargs = [${entry.args.map(quote).join(', ')}]\n` };
+        return { kind: 'manual', text: `Add this to ~/.codex/config.toml:\n\n[mcp_servers.${SERVER}]\ncommand = ${quote(entry.command)}\nargs = [${entry.args.map(quote).join(', ')}]\n${entry.env ? `\n[mcp_servers.${SERVER}.env]\n${Object.entries(entry.env).map(([key, value]) => `${key} = ${quote(value)}`).join('\n')}\n` : ''}` };
       }
       return { kind: 'command', argv, undo: ['codex', 'mcp', 'remove', SERVER], exists: ['codex', 'mcp', 'get', SERVER] };
     },
@@ -71,7 +72,7 @@ export const HOSTS = {
       kind: 'json',
       file: scope === 'project' ? join(cwd, 'opencode.json') : join(homedir, '.config', 'opencode', 'opencode.json'),
       keyPath: ['mcp', 'servers', SERVER], // OpenCode v2; v1 keeps servers directly under "mcp"
-      value: { type: 'local', command: [entry.command, ...entry.args], enabled: true },
+      value: { type: 'local', command: [entry.command, ...entry.args], ...(entry.env ? { environment: entry.env } : {}), enabled: true },
     }),
     skillDir: ({ scope, cwd, homedir }) => (scope === 'project' ? join(cwd, '.opencode', 'skills', SERVER) : join(homedir, '.config', 'opencode', 'skills', SERVER)),
   },
@@ -83,7 +84,7 @@ export const HOSTS = {
     // Its config is YAML, which this dependency-free launcher will not rewrite.
     plan: ({ entry }) => ({
       kind: 'manual',
-      text: `Add this to ~/.hermes/config.yaml:\n\nmcp_servers:\n  ${SERVER}:\n    command: ${quote(entry.command)}\n    args: [${entry.args.map(quote).join(', ')}]\n`,
+      text: `Add this to ~/.hermes/config.yaml:\n\nmcp_servers:\n  ${SERVER}:\n    command: ${quote(entry.command)}\n    args: [${entry.args.map(quote).join(', ')}]\n${entry.env ? `    env:\n${Object.entries(entry.env).map(([key,value]) => `      ${key}: ${quote(value)}`).join('\n')}\n` : ''}`,
     }),
     skillDir: () => null,
   },

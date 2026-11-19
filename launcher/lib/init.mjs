@@ -41,11 +41,16 @@ function absolute(path, io) {
 }
 
 function serverEntry(flags, io) {
-  const args = ['-y', npxRef(io.env), 'serve'];
+  const args = ['-y', npxRef(io.env, io.cwd), 'serve'];
   if (flags['workspace-root']) args.push('--workspace-root', absolute(flags['workspace-root'], io));
   for (const root of flags.sourceRoots) args.push('--source-root', absolute(root, io));
   if (flags.profile) args.push('--profile', flags.profile);
-  return { command: 'npx', args };
+  const env = {};
+  // Persist only launch dependencies, never copy the installer's full environment.
+  if (io.env.ANKIPLUSMCP_PY_SPEC) env.ANKIPLUSMCP_PY_SPEC = io.env.ANKIPLUSMCP_PY_SPEC;
+  const uv = findUv(io.env, io.homedir);
+  if (uv || io.env.ANKIPLUSMCP_UV) env.ANKIPLUSMCP_UV = uv || io.env.ANKIPLUSMCP_UV;
+  return { command: 'npx', args, ...(Object.keys(env).length ? { env } : {}) };
 }
 
 function dataDir(io) {
@@ -221,10 +226,19 @@ export async function initMain(argv, io) {
   }
   if (flags['dry-run']) { say('\nDry run: nothing was changed.\n'); return finish(0); }
 
+  // A prior install may have needed manual runtime overrides. When re-init's
+  // exact desired entry is already present, refresh only our existing receipt;
+  // never claim ownership of an untracked pre-existing entry.
+  const tracked = (previous ?? []).map((done) => {
+    const index = changes.findIndex((change) => change.kind === 'json' && done.kind === 'json'
+      && change.file === done.file && sameValue(change.keyPath, done.keyPath));
+    return index >= 0 && verdicts[index].status === 'unchanged'
+      ? { ...done, value: changes[index].value } : done;
+  });
   const pending = changes.map((change, i) => [change, verdicts[i], i]).filter(([, verdict]) => verdict.status === 'planned');
   if (pending.length > 0) {
     if (!(await confirmed('Make these changes?', flags, io))) { say('Nothing was changed.\n'); return finish(1); }
-    const records = (previous ?? []).filter((done) => !pending.some(([change]) => change.kind === done.kind));
+    const records = tracked.filter((done) => !pending.some(([change]) => change.kind === done.kind));
     try {
       for (const [change, verdict, index] of pending) {
         records.push(apply(change, verdict, io));
@@ -239,7 +253,11 @@ export async function initMain(argv, io) {
     }
     say('Done. Restart the host so it picks up the new server.\n');
   } else {
-    say('Already set up; nothing to change.\n');
+    if (previous && !sameValue(previous, tracked)) {
+      manifest.installs = manifest.installs.map((entry) => sameInstall(entry) ? { ...entry, changes: tracked } : entry);
+      writeManifest(io, manifest);
+      say('Registration unchanged; install record updated.\n');
+    } else say('Already set up; nothing to change.\n');
   }
   return finish(0, flags['no-warmup'] ? null : await warmUp(io, flags.json));
 }
@@ -247,8 +265,10 @@ export async function initMain(argv, io) {
 function reverse(done, io, dryRun) {
   if (done.kind === 'json') {
     const read = readStrictJson(done.file);
-    if (!read.ok) return 'gone';
-    if (!sameValue(getAt(read.data, done.keyPath), done.value)) return 'kept (changed since install)';
+    if (!read.ok) return read.reason === 'missing' ? 'gone' : 'kept (config is not plain JSON)';
+    const current = getAt(read.data, done.keyPath);
+    if (current === undefined) return 'gone';
+    if (!sameValue(current, done.value)) return 'kept (changed since install)';
     if (dryRun) return 'planned';
     deleteAt(read.data, done.keyPath);
     if (done.created && Object.keys(read.data).length === 0) unlinkSync(done.file); else writeWithBackup(done.file, read.data);
@@ -289,17 +309,23 @@ export async function uninstallMain(argv, io) {
     return 1;
   }
   const report = [];
+  const unresolved = [];
   for (const entry of chosen) {
+    const remaining = [];
     for (const done of entry.changes) {
       const status = reverse(done, io, flags['dry-run']);
       report.push({ host: entry.host, kind: done.kind, target: target({ ...done, argv: done.undo ?? done.argv }), status });
       say(`  ${status.padEnd(9)} ${report.at(-1).target}\n`);
+      if (status !== 'removed' && status !== 'gone') remaining.push(done);
     }
+    if (remaining.length) unresolved.push({ ...entry, changes: remaining });
   }
   if (!flags['dry-run']) {
-    manifest.installs = manifest.installs.filter((entry) => !chosen.includes(entry));
+    manifest.installs = [...manifest.installs.filter((entry) => !chosen.includes(entry)), ...unresolved];
     writeManifest(io, manifest);
   }
   if (flags.json) io.out(JSON.stringify({ changes: report }) + '\n');
-  return report.some((item) => item.status === 'failed') ? 2 : 0;
+  const incomplete = report.some((item) => item.status.startsWith('kept'));
+  if (incomplete) say('Uninstall incomplete: changed entries were preserved; their install records are retained for retry.\n');
+  return report.some((item) => item.status === 'failed') ? 2 : incomplete ? 3 : 0;
 }

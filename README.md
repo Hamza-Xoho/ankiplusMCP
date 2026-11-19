@@ -258,3 +258,7 @@ See [the approved design](docs/superpowers/specs/2026-11-18-student-workflows-de
 ### Pre-macOS refactor investigation
 
 The source catalog, artifact publisher, authoritative run discovery and shared coverage batches are internal refactors; they do not establish Desktop or release compatibility. Run the disposable synthetic rehearsal with `.venv/bin/python scripts/smoke-premacos.py --output .artifacts/premacos/smoke.json` (fresh output only). It uses real extraction, OCR and Chromium with zero Anki operations. See [local evidence](docs/refactor/premacos-readiness.md) and the [ordered Mac test packet](docs/refactor/macos-test-packet.md). Independent host reviewers, companion integration, onboarding and private-quality acceptance remain outstanding.
+
+For a local test build, set `ANKIPLUSMCP_NPX_REF` to its launcher `.tgz` and `ANKIPLUSMCP_PY_SPEC` to its absolute wheel path before `init`. Local launcher paths become absolute `file:` references. Init records the Python override and resolved uv executable in the host registration, so restarted Desktop does not depend on the installer's shell PATH. `ANKIPLUSMCP_UV` explicitly selects a nonstandard uv location. Only these runtime dependencies are persisted, not the full shell environment.
+
+Uninstall preserves entries edited since installation. It exits **3** and retains their install records when removal is incomplete; restore the recorded entry before retrying, or resolve that entry explicitly. Backups are retained. See [Mac lifecycle evidence and retesting](docs/refactor/macos-host-lifecycle.md).
