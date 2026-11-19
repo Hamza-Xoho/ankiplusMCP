@@ -239,3 +239,24 @@ label accurately records the uncommitted fixes at build start. No real companion
 collection, registration or public endpoint was touched. Raw image identity and
 logs remain in the ignored follow-up workspace. Companion commits bc0d15d,
 4d15b1f and 7f051c6 are pushed to the authorized existing branch.
+
+## 2026-11-19 guarded adapter continuation
+
+Code revisions: primary `81615af77686d0b7ee5b9fa102e6cb2ab580fa2b`, companion
+`0fa5075612f54f65ca9c59d6b6a7c689f6578a07`. Conditional suspension and full-field
+updates now share the synchronous exact-state guard. The primary exposes fixed
+adapter write methods, validates note-type/template/style metadata, retains batch
+acknowledgements and stops on missing/invalid create identities. Final Linux public
+suite:677passed/25existing skips; check-mcp444passed/1existing skip; companion882passed.
+One fresh engineering review found the malformed-create acknowledgement defect;
+six RED→GREEN regressions and the full suite verify its repair. No product-quality
+review pass is implied.
+
+The requested full student product remains incomplete. Coordinator authorization,
+quality-bound proposals, durable intent/application/readback/reconciliation,
+production interactive review, verified resumable onboarding and remaining audit
+closure are unfinished T3 scope. They are not Mac/private-environment blockers.
+See [current acceptance status](macos-acceptance.md), which explicitly records
+that the product is not ready for Mac acceptance. All previous ledgers and ignored
+evidence remain retained. No Mac installation, collection operation, deployment,
+publication or PR was performed.

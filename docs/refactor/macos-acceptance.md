@@ -122,3 +122,12 @@ Rulings: add only fixed guarded suspension to meet the original contract (cost:
 one additional primitive); preserve all ledgers and label this packet not ready
 (cost: no completed acceptance-packet claim); leave Mac/private execution
 unaccepted (cost: no platform/quality pass). No deferred Minor review findings.
+
+Final container verification: clean build-start revision
+`c5029a490fd7f95206ce58cb50c6a4960b8bf6f0` (contains code fix `81615af`)
+passed Compose validation/build and the hardened smoke above, including installed
+adapter rejection of malformed create identities using synthetic transport only.
+Image: `sha256:aa1c0fca4ebfb6c60021ec8a34be2b1f4e70c9824558c9c8051cad9f98be2b64`,
+OCI revision label `c5029a4`. Raw `final-build.log`, `final-container-smoke.log`,
+`container-smoke.py` and `final-image.txt` remain in the ignored primary ledger
+workspace. Documentation-only updates follow that tested image revision.
