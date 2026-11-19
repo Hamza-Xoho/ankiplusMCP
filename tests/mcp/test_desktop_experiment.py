@@ -131,3 +131,12 @@ def test_probe_manifest_identifies_generated_files_and_dirty_source(tmp_path):
     assert template['overall_status']=='not_run'
     assert template['companion']['writes']=='not_authorized'
     assert template['surfaces']['chat']['embedded_review']=='not_run'
+
+
+def test_reviewer_probe_cannot_claim_blind_recall_from_parallel_sheets(tmp_path):
+    module=load(SCRIPT,'blind_recall_preparation');root=Path(prepared(tmp_path)['root'])
+    info=module.prepare_reviewers(root)
+    assert info['blind_recall_evidence']=='blocked_by_existing_parallel_image_packet'
+    assert 'Cannot verify blind recall' in (root/'EXPECTATIONS.md').read_text()
+    template=json.loads((root/'HOST-RESULTS.template.json').read_text())
+    assert template['reviewers']['blind_recall']=='unverified_parallel_front_back_exposure'

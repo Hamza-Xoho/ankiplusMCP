@@ -79,6 +79,9 @@ a `.mcp.json` copied from `registration.json`. Open that folder as the local Cod
 project for the reviewer stage so its `.claude/agents/` definitions are discovered.
 Keep repository `.claude/` files frozen. Project MCP enablement/restart prompts are
 normal host interactions for the owner to accept in the app.
+Confirm both aliases actually appear in the runtime's available agents. If project
+discovery or inherited hooks prevent loading them, save the exact error and mark
+that stage blocked; preserve the guards and report the loading limitation.
 
 Quit/reopen as needed and confirm the **probe** lists four tools and its single
 `ui://ankiplus-probe/review.html` resource. The working product remains a separate
@@ -127,8 +130,13 @@ the definitions' Sonnet 5.5 / high maintainer and medium student settings and tu
 limits. Capture actual agent IDs, model/effort, invocation inputs and transcripts.
 
 Each agent reads its packet and writes only its named report. The student sees
-contact sheets without source/draft answers and must commit front answers before
-judging backs. Verify actual image reads and answer sequence from the transcript.
+contact sheets without source/draft text. Verify actual image reads and recorded
+front answers from the transcript. **Blind recall remains unverified:** the frozen
+packet requests opening all front and back sheets in one parallel turn, exposing
+both to the model together. That transcript cannot prove answers preceded seeing
+backs. Preserve the existing instructions and record this conflict; staged image
+exposure requires an explicit later decision before changing the quality process.
+Fresh independent execution and blind-answer timing are separate evidence fields.
 Separate filenames or the main agent saying it used reviewers are insufficient.
 If the runtime cannot load these agents, enforce their settings or provide fresh
 contexts, report the precise limitation. A main-agent self-review is not a pass.
@@ -208,11 +216,34 @@ Do not silently change apps, reviewers, quality policy or subscription requireme
 ## Development-host evidence, 2026-11-19
 
 The disposable preparation, stdio/resource checks and SDK iframe emulator ran
-locally with zero Anki operations. Eight focused tests pass; the reviewer packets
+locally with zero Anki operations. Nine focused tests pass; the reviewer packets
 contain actual rendered PNGs, preserved templates and isolated inputs, but no AI
 reviewer has executed on this host for product acceptance. Schema measurements
 are 1,668 bytes / four probe tools and 30,142 bytes / 36 production tools using
 the serialization above. Raw evidence is ignored under
 `.artifacts/compatibility-local/`; build hashes/revision/dirty status accompany it.
 Actual Desktop embedding, model-channel forwarding, independent Mac reviewers
-and installed companion operations remain unverified.
+and installed companion operations remain unverified. A fresh read-only review
+identified the front/back exposure limitation; metadata and evaluator guidance
+now explicitly prevent treating it as proven blind recall. Frozen content remains
+unchanged; a regression demonstrated the missing limitation before this fix.
+
+Execution rulings and their costs:
+
+- Version the developer preparation script and isolated npm lock so ignored
+  experiments can travel through Git. Cost: a small maintained development harness;
+  production packages/dependencies are unchanged.
+- Keep production interfaces gated on actual host results. Cost: the full user
+  workflow is still incomplete even when this local probe passes.
+- Use sample-only reviewer aliases with frozen instruction bodies/templates and
+  restricted tools. Cost: this cannot establish real collection-search integration.
+- Preserve the front/back packet while explicitly withholding blind-recall proof.
+  Cost: that quality acceptance needs a decision about staged exposure.
+- Keep Mac embedding/channels, actual reviewer runtime/settings, and companion
+  discovery/write recovery as separate external gates. Cost: no combined-host or
+  collection-recovery support claim yet.
+- Leave the five original production Review Focus scenarios under their existing
+  implementation/acceptance gates. Cost: this synthetic checkpoint adds no evidence
+  that closes those full-product cases.
+- Retain implementer command evidence for checks the reviewer did not rerun.
+  Cost: mechanical verification has no second independent execution here.

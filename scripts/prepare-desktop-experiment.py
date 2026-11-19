@@ -188,7 +188,7 @@ def prepare(output: Path) -> dict:
         'surfaces':{surface:{'execution_location':None,'embedded_review':'not_run','edit_exclude':'not_run',
             'reconnect':'not_run','stale_refusal':'not_run','ui_click_model_turn':'not_measured',
             'content_channels':'not_run','evidence':[]} for surface in ('chat','code','cowork')},
-        'reviewers':{'status':'not_run','maintainer':{'agent_id':None,'model':None,'effort':None,'report':None,'transcript':None},
+        'reviewers':{'status':'not_run','blind_recall':'unverified_parallel_front_back_exposure','maintainer':{'agent_id':None,'model':None,'effort':None,'report':None,'transcript':None},
             'student':{'agent_id':None,'model':None,'effort':None,'report':None,'transcript':None},'provenance_verified':False},
         'companion':{'status':'not_run','version':None,'transport':None,'tool_schema_file':None,
             'capability_matrix':None,'writes':'not_authorized','performed_anki_operations':0},
@@ -256,8 +256,9 @@ def prepare_reviewers(output: Path) -> dict:
         hashes[role]=hashlib.sha256(original.encode()).hexdigest()
     (output/'CLAUDE.md').write_text('This is a synthetic compatibility experiment. Use the named compat-maintainer/compat-student agents only when explicitly requested, supplying only the packet PROMPT.md path. Each starts fresh and reads only its packet. Reports remain at their named paths. Anki operations are unauthorized here. Read EXPECTATIONS.md only after both reports have been saved; it is evaluator-only input.\n')
     # Never pass the answer key or author discussion to either reviewer.
-    (output/'EXPECTATIONS.md').write_text('Evaluator only, after reports: n002 contradicts the supplied source (eosinophilic versus basophilic). The maintainer should detect the source-fidelity defect. Student review must include real committed front answers and inspection of all sheets; there is no predetermined visual verdict. Neither report is independent merely because its filename exists. Save agent IDs/model/effort and the actual input prompt/transcript provenance separately.\n')
-    info={'maintainer':str(base/'maintainer'),'student':str(base/'student'),'agent_source_hashes':hashes,'independently_verified':False}
+    (output/'EXPECTATIONS.md').write_text('Evaluator only, after reports: n002 contradicts the supplied source (eosinophilic versus basophilic). The maintainer should detect the source-fidelity defect. Student review must record front answers and inspect all sheets; there is no predetermined visual verdict. Cannot verify blind recall: the preserved packet requests fronts and backs in the same parallel read turn. Fresh reviewer execution may be proven, but blind-answer timing remains unverified pending an explicit decision about staged image exposure. Neither report is independent merely because its filename exists. Save agent IDs/model/effort and the actual input prompt/transcript provenance separately.\n')
+    info={'maintainer':str(base/'maintainer'),'student':str(base/'student'),'agent_source_hashes':hashes,'independently_verified':False,
+        'blind_recall_evidence':'blocked_by_existing_parallel_image_packet'}
     (output/'reviewer-packets.json').write_text(json.dumps(info,indent=2)+'\n')
     return info
 
