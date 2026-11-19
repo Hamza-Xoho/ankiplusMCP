@@ -116,6 +116,10 @@ Invoke `open_sample_review` through the probe, then have the owner:
    data directory. If the host cannot restore the view, record that distinction.
 4. Open two views at the same revision. Save one; saving the other must show
    `STALE` and leave the first result intact. Reload and confirm the latest state.
+   Use [two fresh working views](macos-ipc-probe-retest.md#continue-after-the-reported-chat-persistence-pass)
+   for this check. An old view showing `Missing synthetic state` cannot establish
+   stale refusal; if the host automatically refreshes the second view, record
+   that stale submission was not exercised.
 
 If Save reports `IPC not available for MCP tool call`, preserve the exact error
 and server log/state evidence. Stop repeating the unchanged test and follow the

@@ -135,3 +135,35 @@ latest generator's `SERVER` constant, keeping the registered path and data-root:
 Record each surface/registration/server revision separately. Neither a metadata
 correction nor a Chat result proves a working Code view. Keep the production gate
 open until the actual combined host/reviewer/companion requirements are met.
+
+## Continue after the reported Chat persistence pass
+
+The latest Mac report establishes Chat save/readback, explicit Reload and full
+restart persistence in a fresh Chat at revision 1. Preserve the separate display
+limitations: immediate save feedback was stale until Reload, and an older
+conversation showed `Missing synthetic state`. The cause of that restore error
+is unknown. Record exact tool-result/channel evidence if available; persisted
+state being intact does not validate the old widget's restoration behavior.
+
+For stale refusal, the owner uses **two new, working Chat views**, A and B:
+
+1. Open the sample in each and verify both show the same current revision before
+   saving either. Record the real revision instead of hard-coding it as 1.
+2. In A, change sample-a text to `stale-test-A` and Save once. The agent verifies
+   that the server revision advanced and that text is persisted. Explicit Reload
+   can verify the display if immediate save feedback is stale; record that limit.
+3. Return to B and verify it still has the earlier revision. If the host already
+   refreshed or recreated B at the latest revision, record that this attempt did
+   not exercise a stale view. Do not claim stale refusal from a non-stale request.
+4. If B remains stale, change sample-a to `stale-test-B` and click Save once,
+   before Reload. Expect a stale-version refusal; verify server state still has
+   `stale-test-A` at A's revision, with no second state change.
+5. Reload B and confirm the accepted A state. Save evidence of the stale error
+   and server readback; another successful save is not a stale-refusal pass.
+
+Keep all operations in the synthetic probe. The old broken conversation is an
+independent restore investigation, not the B view. Current Code errors can be
+collected separately from relevant logs and a fresh Code opener attempt, asking
+the owner only for visible error text when the agent cannot inspect it. Preserve
+reported successes and failures separately; no production or Anki operation is
+authorized by these probe results.

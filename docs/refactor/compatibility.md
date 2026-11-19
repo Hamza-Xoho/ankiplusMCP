@@ -133,3 +133,25 @@ and unchanged CLI golden. The real stdio/resource check and SDK iframe emulator
 passed using the unchanged previously built UI bundle; zero Anki operations.
 The probe schema is now 1,770 UTF-8 bytes with the compatibility aliases; the
 production schema remains 30,142 bytes. This is local evidence only.
+
+## Reported Chat save and restart persistence
+
+The owner subsequently pasted Mac-agent evidence that the **Desktop Chat**
+widget's Save reached the server: the observation log names the Chat client and
+state.json/read_sample_state show revision 1, sample-a `Mac test edit` selected
+and sample-b excluded. Reload then displayed the same revision/text/selection.
+After a full Desktop quit/reopen, a newly opened Chat view showed those decisions
+again, matching server readback and the unchanged state file. These establish
+reported save, explicit reload and fresh-Chat restart persistence for that probe.
+Zero Anki operations were reported. Raw Mac files remain on the Mac; this host
+has not independently inspected them. The exact source/runtime identity for this
+latest result must be retained in that Mac evidence rather than inferred here.
+
+Two display limitations remain: save feedback initially stayed stale until
+Reload, and a previous conversation's view displayed `Missing synthetic state`.
+Persisted data remains intact according to readback, but the old-view error's
+cause is undiagnosed. Do not call it harmless or use that broken widget to prove
+stale-decision refusal. Use two freshly rendered working views, confirm their
+starting revisions and verify an actual rejected stale save. Latest Code-surface
+error, content-channel behavior, independent reviewer execution and the companion
+gates remain outstanding. A Chat pass does not establish a combined Code workflow.
