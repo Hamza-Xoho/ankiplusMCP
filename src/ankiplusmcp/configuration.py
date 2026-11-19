@@ -99,6 +99,9 @@ class ConfigStore:
             changed = sorted(k for k in changes if getattr(current, k) != getattr(after, k))
             if not changed:
                 raise DomainError('CONFIG', 'No preferences changed.')
+            if set(changed)&{'profile','note_type'}:
+                after.onboarding_complete=False
+                after.health_checks={k:v for k,v in after.health_checks.items() if k!='connection'}
             proposal = ConfigChange(id=uuid4().hex, expected_version=expected_version,
                                     before=current, after=after, changed_keys=changed)
             _publish(self.directory / 'proposals' / (proposal.id + '.json'), proposal.model_dump())
@@ -119,3 +122,17 @@ class ConfigStore:
             _publish(target, proposal.after.model_dump())
             _publish(self.pointer, {'version': proposal.after.config_version, 'change_id': proposal.id})
             return proposal.after
+
+
+    def _record_setup(self, checks, complete):
+        """Internal verified milestone publication; never exposed as a preference/tool input."""
+        with self._lock():
+            current,pointer=self._current()
+            if current.health_checks==checks and current.onboarding_complete==complete and current.onboarding_version==1:
+                return current
+            highest=max(int(p.stem) for p in (self.directory/'versions').glob('[0-9]'*20+'.json'))
+            value=UserConfig.model_validate({**current.model_dump(),'config_version':highest+1,'health_checks':checks,
+                'onboarding_complete':complete,'onboarding_version':1})
+            _publish(self.directory/'versions'/f'{value.config_version:020d}.json',value.model_dump())
+            _publish(self.pointer,{'version':value.config_version,'change_id':None})
+            return value

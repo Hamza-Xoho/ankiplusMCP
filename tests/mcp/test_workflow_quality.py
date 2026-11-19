@@ -128,3 +128,42 @@ def test_student_report_cannot_rewrite_committed_front_answer(workflow):
     gate.release(r.id,p.content_digest,ticket['ticket_id'],value['attempts'])
     value['report']=value['report'].replace('**Attempt:** Fibroblasts','**Attempt:** A different answer')
     with pytest.raises(DomainError):gate.submit(r.id,p.content_digest,attest(c,r.id,p.content_digest,value))
+
+
+def test_quality_packet_reviews_actual_existing_target_not_unused_new_draft(workflow):
+    import json
+    from pathlib import Path
+    from test_coordinator import existing
+    from ankiplusmcp.quality import QualityGate
+    c,s,e,r,d=workflow;existing(workflow)
+    wait(s,r.workspace,s.render_cards(r.workspace));p=run(c.stage(r.id))
+    ticket=QualityGate(c).prepare(r.id,p.content_digest,'maintainer')
+    cards=json.loads((Path(ticket['packet_path'])/'drafts.json').read_bytes())['cards']
+    assert cards[0]['fields']['Back']=='Existing answer'
+    assert cards[0]['fields']['Front']=='Existing question'
+
+
+def test_image_only_pdf_evidence_packet_contains_actual_cited_page(tmp_path):
+    import pymupdf as fitz
+    from pathlib import Path
+    from contextlib import asynccontextmanager
+    from test_coordinator import SyntheticCompanion
+    from ankiplusmcp.anki_adapter import AnkiAdapter
+    from ankiplusmcp.service import Service
+    from ankiplusmcp.coordinator import Coordinator
+    from ankiplusmcp.quality import QualityGate
+    pdf=tmp_path/'diagram.pdf';doc=fitz.open();page=doc.new_page();page.insert_text((40,40),'Synthetic diagram evidence');doc.save(pdf);doc.close()
+    s=Service(tmp_path/'data',[tmp_path]);external=SyntheticCompanion()
+    @asynccontextmanager
+    async def connection():yield AnkiAdapter(external,profile='Main',collection_path=external.binding['collection_path'])
+    s.companion_connection=connection
+    try:
+        w=s.store.create('lecture',str(pdf))['id'];wait(s,w,s.extract_source(w))
+        s.save_cards(w,[dict(id='diagram',kind='basic',notetype='Basic',fields={'Front':'Diagram question','Back':'Synthetic answer'},tags=['#AnkiPlus::Synthetic'],source_ref=[1])],0)
+        c=Coordinator(s);c.config.confirm(c.config.propose({'profile':'Main','note_type':'Basic'},1).id);r=c.start(w,[1])
+        source=s.store.get(w)['source']['sha256']
+        run(c.coverage(r.id,'diagram',[{'concept_id':'diagram','draft_id':'diagram','disposition':'propose_create','source_refs':[{'source_hash':source,'page':1}]}]))
+        p=run(c.stage(r.id));ticket=QualityGate(c).prepare(r.id,p.content_digest,'maintainer')
+        pages=[n for n in ticket['files'] if n.startswith('source-page-') and n.endswith('.png')]
+        assert pages and (Path(ticket['packet_path'])/pages[0]).read_bytes().startswith(b'\x89PNG')
+    finally:s.close()

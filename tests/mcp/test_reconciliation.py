@@ -8,6 +8,8 @@ from test_workflow_quality import quality_ready
 def approved(workflow):
     c,s,e,r,d=workflow;covered(workflow);p=quality_ready(workflow)
     c.authorize(r.id,p.digest,'user')
+    from test_verified_onboarding import setup_ready
+    setup_ready(workflow)
     return p
 
 

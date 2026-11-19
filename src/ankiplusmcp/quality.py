@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import os
 import stat
+import re
 import json
 from pathlib import Path
 from uuid import uuid4
@@ -62,8 +63,7 @@ class QualityGate:
         with self.c.lock(run_id):
             p=self.c._latest(run_id);self.c._current(run_id,p.digest)
             if p.content_digest!=content_digest:raise DomainError('STALE','Quality packet content is stale.')
-            preview=self.c.s.prepare_review(self.c.runs.read(run_id).workspace,'visual')
-            if 'sheets' not in preview:raise DomainError('QUALITY_PREVIEW','Render the current selected drafts before quality review.')
+            if not p.review_cards:raise DomainError('QUALITY','No actionable review cards are selected.')
             workspace=self.c.runs.read(run_id).workspace
             from cards.review.packets import TEMPLATES
             blobs={name:(TEMPLATES/role/name).read_bytes() for name in ('brief.md','rubric.md','report-format.md')}
@@ -75,23 +75,64 @@ class QualityGate:
                 'then inspect released backs once within the same cumulative six-turn reviewer budget.\n').encode()
             if role=='maintainer':
                 inputs=self.c._inputs(run_id)
-                blobs['drafts.json']=_encoded({'cards':p.cards,'decisions':p.decisions})
+                blobs['drafts.json']=_encoded({'cards':p.review_cards,'decisions':p.decisions})
                 blobs['source-evidence.json']=_encoded({'selection':p.source,'evidence':inputs['evidence'],'coverage':inputs['coverage']})
+                pages=sorted({e['page'] for e in inputs['evidence'] if e['location_kind']=='pdf_page'})
+                for page_number in pages:
+                    asset=self.c.s.get_page_image(workspace,page_number)
+                    blobs[f'source-page-{page_number}.png']=self.c.s.image_bytes(workspace,asset['artifact'])
+            if len(blobs)>250 or sum(len(v) for v in blobs.values())>128*1024*1024:
+                raise DomainError('LIMIT','Narrow the quality packet source selection; no evidence was silently omitted.')
+            ticket_id=uuid4().hex;path=self._packet(run_id,ticket_id);path.mkdir(parents=True)
+            sheets=self._render(p,path,workspace)
             tile_ids=[]
-            for i,sheet in enumerate(preview['sheets']):
+            for i,sheet in enumerate(sheets):
                 tile_ids.extend(sheet['notes'])
                 for side in ('fronts','backs'):
-                    blobs[f'{side}-{i}.png']=self.c.s.image_bytes(workspace,sheet[side])
-            ticket_id=uuid4().hex;path=self._packet(run_id,ticket_id);path.mkdir(parents=True)
+                    blobs[f'{side}-{i}.png']=Path(sheet[side]).read_bytes()
+            self.c._current(run_id,p.digest)
             (path/'packet').mkdir();(path/'supervisor').mkdir()
             for name,data in blobs.items():
                 target=path/('supervisor' if role=='student' and name.startswith('backs') else 'packet')/name
                 with target.open('xb') as stream:stream.write(data)
             ticket={'ticket_id':ticket_id,'content_digest':content_digest,'role':role,'tools':ROLE_TOOLS[role],
                     'files':{n:hashlib.sha256(b).hexdigest() for n,b in blobs.items()},'tile_ids':sorted(set(tile_ids)),
-                    'packet_path':str(path/'packet'),'max_turns':LIMITS[role]}
+                    'packet_path':str(path/'packet'),'max_turns':LIMITS[role],'draft_ids':[c['id'] for c in p.review_cards]}
             self.c.event(run_id,'quality_issued',ticket)
             return ticket
+
+    def _render(self,proposal,path,workspace):
+        from cards.render import render_rows
+        from cards.render.templates import fill,page,CLOZE
+        from cards.common.paths import Build
+        from .doctor import require_browser
+        rows=[];build=Build(self.c.s.store.directory(workspace))
+        media={name:str(self.c.s.store.path(workspace,m['path'])) for name,m in proposal.media.items()}
+        for card in proposal.review_cards:
+            model=card['model'];fields=card['fields'];kind=card['kind']
+            if kind=='io':
+                from cards.render.occlusion import bodies
+                fronts,answer=bodies(build,fields,media)
+                pairs=[(n,question,answer) for n,question in fronts]
+            else:
+                numbers=sorted({int(m[1]) for v in fields.values() for m in CLOZE.finditer(v)}) if kind=='cloze' else [1]
+                if not numbers:raise DomainError('QUALITY','No renderable cloze is present.')
+                pairs=[]
+                for ordinal,template in enumerate(model['tmpls'],1):
+                    for markup in (template['qfmt'],template['afmt']):
+                        specs=re.findall(r'\{\{([^{}]+)\}\}',markup)
+                        if any(':' in spec and not spec.startswith('cloze:') for spec in specs):
+                            raise DomainError('UNSUPPORTED','This note type uses a filter whose rendering has not been verified.')
+                    for n in numbers:
+                        question=fill(template['qfmt'],fields,card['tags'],n,'front')
+                        answer=fill(template['afmt'],fields,card['tags'],n,'back',question)
+                        pairs.append((n if kind=='cloze' else ordinal,question,answer))
+            for ordinal,question,answer in pairs:
+                clean=lambda text:page('',text,build,media).split("<div id='qa'>",1)[1].rsplit('</div></body>',1)[0]
+                if '</style' in model['css'].lower():raise DomainError('UNSUPPORTED','This note type contains unsupported embedded style markup.')
+                css='<style>'+model['css']+'</style>'
+                rows.append({'id':card['id']+'_c'+str(ordinal),'question':css+clean(question),'answer':css+clean(answer)})
+        return render_rows(rows,path/'renders',css='',browser=require_browser(self.c.s.browser))
 
     def release(self,run_id,content_digest,ticket_id,attempts):
         with self.c.lock(run_id):
@@ -168,9 +209,9 @@ class QualityGate:
             if report_path.exists() and report_path.read_text()!=report:raise DomainError('QUALITY','A completed report cannot be replaced.')
             report_path.write_text(report)
             from cards.review.parse_report import parse
-            rows=parse(report_path,role,ids={c['id'] for c in p.cards},fields={c['id']:set(c['fields']) for c in p.cards})
+            rows=parse(report_path,role,ids={c['id'] for c in p.review_cards},fields={c['id']:set(c['fields']) for c in p.review_cards})
             notes=[r for r in rows if r['type']=='note'];summaries=[r for r in rows if r['type']=='summary']
-            if {r['note_id'] for r in notes}!={c['id'] for c in p.cards} or len(notes)!=len(p.cards):raise DomainError('QUALITY','Review must cover every selected draft exactly once.')
+            if {r['note_id'] for r in notes}!={c['id'] for c in p.review_cards} or len(notes)!=len(p.review_cards):raise DomainError('QUALITY','Review must cover every selected draft exactly once.')
             if role=='student':
                 for row in notes:
                     answers=[v for k,v in receipt['attempts'].items() if k==row['note_id'] or k.startswith(row['note_id']+'_c')]

@@ -12,7 +12,7 @@ import { npxRef, pySpec, VERSION } from './spec.mjs';
 import { findUv, MISSING_UV } from './uv.mjs';
 
 const SKILL_SOURCE = fileURLToPath(new URL('../../skills/ankiplusmcp', import.meta.url));
-const VALUE_FLAGS = new Set(['--host', '--scope', '--workspace-root', '--profile']);
+const VALUE_FLAGS = new Set(['--host', '--scope', '--workspace-root', '--profile', '--companion-url', '--anki-profile', '--anki-collection-path', '--companion-token-file']);
 const INIT_SWITCHES = new Set(['--yes', '--dry-run', '--force', '--print', '--json', '--no-warmup']);
 const UNINSTALL_SWITCHES = new Set(['--yes', '--dry-run', '--json']);
 
@@ -41,10 +41,20 @@ function absolute(path, io) {
 }
 
 function serverEntry(flags, io) {
+  const companion = ['companion-url', 'anki-profile', 'anki-collection-path', 'companion-token-file'];
+  if (companion.some((key) => flags[key])) {
+    if (!flags['companion-url'] || !flags['anki-profile'] || !flags['anki-collection-path']) throw new UsageError('Companion registration requires --companion-url, --anki-profile and --anki-collection-path.');
+    let endpoint;
+    try { endpoint = new URL(flags['companion-url']); } catch { throw new UsageError('Use an explicit loopback HTTP companion endpoint.'); }
+    if (endpoint.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(endpoint.hostname) || !endpoint.port || ['80', '8080'].includes(endpoint.port) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new UsageError('Use an explicit loopback HTTP companion endpoint with an unreserved port and no inline credentials.');
+  }
   const args = ['-y', npxRef(io.env, io.cwd), 'serve'];
   if (flags['workspace-root']) args.push('--workspace-root', absolute(flags['workspace-root'], io));
   for (const root of flags.sourceRoots) args.push('--source-root', absolute(root, io));
   if (flags.profile) args.push('--profile', flags.profile);
+  for (const key of ['companion-url', 'anki-profile', 'anki-collection-path', 'companion-token-file']) {
+    if (flags[key]) args.push('--'+key, ['anki-collection-path','companion-token-file'].includes(key) ? absolute(flags[key],io) : flags[key]);
+  }
   const env = {};
   // Persist only launch dependencies, never copy the installer's full environment.
   if (io.env.ANKIPLUSMCP_PY_SPEC) env.ANKIPLUSMCP_PY_SPEC = io.env.ANKIPLUSMCP_PY_SPEC;

@@ -168,3 +168,23 @@ test('Windows Desktop registration uses APPDATA and keeps detection consistent',
   const fallback = HOSTS['claude-desktop'].plan({ ...options, env: {} });
   assert.equal(fallback.file, join(home, 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'));
 });
+
+test('student companion registration retains explicit binding and private token file path', () => {
+  const p = project(OTHER);
+  const r = init(p, ['--yes', '--companion-url', 'http://127.0.0.1:45678/mcp', '--anki-profile', 'Synthetic Main', '--anki-collection-path', '/tmp/Synthetic Main/collection.anki2', '--companion-token-file', './private-key']);
+  assert.equal(r.status, 0, r.stderr);
+  const data = read(p.file); const args = data.mcpServers.ankiplusmcp.args;
+  assert.equal(args[args.indexOf('--anki-profile') + 1], 'Synthetic Main');
+  assert.equal(args[args.indexOf('--anki-collection-path') + 1], '/tmp/Synthetic Main/collection.anki2');
+  assert.equal(args[args.indexOf('--companion-token-file') + 1], join(p.cwd, 'private-key'));
+  assert.deepEqual(data.mcpServers.other, OTHER.mcpServers.other);
+  assert.equal(init(p, ['--yes', '--companion-url', 'http://127.0.0.1:45678/mcp', '--anki-profile', 'Synthetic Main', '--anki-collection-path', '/tmp/Synthetic Main/collection.anki2', '--companion-token-file', './private-key']).status, 0);
+});
+
+test('incomplete or remote student companion bindings refuse before modifying host configuration', () => {
+  for (const flags of [ ['--companion-url', 'http://127.0.0.1:45678/mcp'], ['--companion-url', 'https://example.test/mcp', '--anki-profile', 'Main', '--anki-collection-path', '/tmp/collection.anki2'] ]) {
+    const p=project(OTHER);const before=readFileSync(p.file,'utf8');
+    assert.notEqual(init(p,['--yes',...flags]).status,0);
+    assert.equal(readFileSync(p.file,'utf8'),before);
+  }
+});

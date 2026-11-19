@@ -18,6 +18,7 @@ const USAGE = `ankiplusmcp ${VERSION}
   npx ankiplusmcp uninstall         Remove what init added.
   npx ankiplusmcp doctor [--json]   Check Node, uv, Tesseract and Chromium.
   npx ankiplusmcp setup [--yes]     Install Chromium for card previews.
+  npx ankiplusmcp onboard [flags]   Resume verified student setup and the tailored guide.
   npx ankiplusmcp history [list|show|export|rebuild|import-legacy] [flags]
                                   Inspect local history; --workspace-root DIR, --json.
   npx ankiplusmcp --version
@@ -89,6 +90,8 @@ async function main() {
     case 'init': return (await import('./lib/init.mjs')).initMain(rest, io());
     case 'uninstall': return (await import('./lib/init.mjs')).uninstallMain(rest, io());
     case 'doctor': return doctor(rest);
+    case 'onboard': return (await python(['onboard', ...rest])).code;
+    case 'verify-host-evidence': return (await python(['verify-host-evidence', ...rest])).code;
     case 'setup': return (await python(['setup', ...rest])).code;
     case '--version': case '-v': return version();
     case '--help': case '-h': case 'help': process.stdout.write(USAGE); return 0;

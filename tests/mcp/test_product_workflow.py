@@ -22,6 +22,8 @@ def test_complete_facade_path_uses_bound_quality_and_real_run_state(workflow):
         if role=='student':api.release_review_backs(r.id,p['content_digest'],ticket['ticket_id'],value['attempts'])
         api.submit_run_quality(r.id,p['content_digest'],attest(c,r.id,p['content_digest'],value))
     p=run(api.stage_run(r.id));api.authorize_run(r.id,p['digest'],'user')
+    from test_verified_onboarding import setup_ready
+    setup_ready(workflow)
     result=run(api.apply_run(r.id,p['digest']))
     assert result['counts']['notes_created']==1
     assert run(api.reconcile_run(r.id))['counts']==result['counts']

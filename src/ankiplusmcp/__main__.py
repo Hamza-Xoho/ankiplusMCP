@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 from . import settings
 
-COMMANDS = ('serve', 'doctor', 'setup', 'history')
+COMMANDS = ('serve', 'doctor', 'setup', 'history', 'onboard', 'verify-host-evidence')
 
 
 def serve(argv):
@@ -56,6 +56,12 @@ def main(argv=None):
         return 0
     command=argv.pop(0) if argv and argv[0] in COMMANDS else 'serve'
     if command=='serve': return serve(argv)
+    if command=='onboard':
+        from .setup_cli import onboard_main
+        return onboard_main(argv)
+    if command=='verify-host-evidence':
+        from .setup_cli import evidence_main
+        return evidence_main(argv)
     if command=='history':
         from .history_cli import history_main
         return history_main(argv)

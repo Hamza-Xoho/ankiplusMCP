@@ -50,11 +50,17 @@ class API:
 
     def get_student_setup(self) -> dict:
         """Resume saved student preferences and show remaining verified setup requirements."""
-        config=self._student_config().read()
-        return {'configuration':config.model_dump(),
-                'remaining_checks':['companion connection and intended profile',
-                    'production interactive review','independent quality reviewer runtime','full workflow acceptance'],
-                'ready_to_apply':False}
+        from .onboarding import Onboarding
+        status=Onboarding(self.s).status()
+        value=status.model_dump()
+        value['ready_to_apply']=status.onboarding_complete
+        return value
+
+    async def advance_student_setup(self, step: Literal['storage','connection','interactive_review','quality_runtime','guide'], evidence: dict) -> dict:
+        """Run a required setup check or validate actual trusted host evidence. Caller completion assertions are refused."""
+        from .onboarding import Onboarding
+        status=await Onboarding(self.s).advance(step,evidence)
+        return {**status.model_dump(),'ready_to_apply':status.onboarding_complete}
 
     def propose_preferences(self, changes: dict, expected_version: Annotated[int,Field(ge=1)]) -> dict:
         """Show a lasting preference diff without saving it. Run-only choices need no saved change."""
@@ -62,9 +68,10 @@ class API:
 
     def confirm_preferences(self, change_id: str) -> dict:
         """Explicitly save a shown preference change and refresh the tailored guide, preserving personal notes."""
-        from .guide import Guide, VerifiedCapabilities
+        from .onboarding import Onboarding
         config=self._student_config().confirm(change_id)
-        guide=Guide.write(config,VerifiedCapabilities())
+        if config.source_roots:self.s.store.set_source_roots([Path(p) for p in config.source_roots],'preferences')
+        guide=Onboarding(self.s).refresh_guide()
         return {**self.get_student_setup(),'guide_path':str(guide)}
 
     async def search_collection_coverage(self, query: Annotated[str,Field(min_length=1,max_length=2000)]) -> dict:
@@ -143,6 +150,32 @@ class API:
     async def reconcile_run(self, run_id: str) -> dict:
         """Read back uncertain intents by known identities; never resend creates or roll back collection data."""
         return await self._coordinator().reconcile(run_id)
+
+    async def open_run_review(self, run_id: str) -> dict:
+        """Open the production source-linked review App for this exact run. No collection writes."""
+        from .review_session import ReviewSession
+        return await ReviewSession(self._coordinator()).open(run_id)
+
+    def read_run_review(self, run_id: str, session_token: str, offset: Offset=0) -> dict:
+        """Read one bounded source-linked review item using its run/session binding."""
+        from .review_session import ReviewSession
+        return ReviewSession(self._coordinator()).read(run_id,session_token,offset)
+
+    def read_run_review_field(self, run_id: str, session_token: str, concept_id: str, name: str,
+                              note_id: int | None=None, offset: Offset=0) -> dict:
+        """Read a complete field in bounded slices before editing it; never substitute a truncated preview."""
+        from .review_session import ReviewSession
+        return ReviewSession(self._coordinator()).field(run_id,session_token,concept_id,name,note_id,offset)
+
+    async def save_run_review(self, run_id: str, session_token: str, expected_proposal_digest: str, decisions: list[dict]) -> dict:
+        """Save run-only review decisions, invalidate affected approval/quality, and revalidate the proposal."""
+        from .review_session import ReviewSession
+        return await ReviewSession(self._coordinator()).decide(run_id,session_token,expected_proposal_digest,decisions)
+
+    def approve_run_review(self, run_id: str, session_token: str, expected_proposal_digest: str) -> dict:
+        """Explicit user approval from a current bound review session; existing quality gates remain mandatory."""
+        from .review_session import ReviewSession
+        return ReviewSession(self._coordinator()).approve(run_id,session_token,expected_proposal_digest)
 
     def get_guidance(self, topic: Literal['overview','quality','maintainer','student']='overview') -> dict:
         """Read optional workflow examples or card/reviewer guidance. No prescribed tool sequence."""
@@ -332,7 +365,7 @@ async def resolve_roots(server, store):
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
-    read_only={'get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
+    read_only={'read_run_review','read_run_review_field','get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):
         if name.startswith('_'): continue
         def wrap(method):
@@ -354,5 +387,11 @@ def create_server(service):
                     data={'status':'error','error':error}
                     return CallToolResult(isError=True,content=[TextContent(type='text',text=json.dumps(data))],structuredContent=data)
             return invoke
-        server.tool(name=name,annotations=ToolAnnotations(readOnlyHint=name in read_only,destructiveHint=False,openWorldHint=False),structured_output=False)(wrap(method))
+        from .review_app import URI
+        meta=({'ui/resourceUri':URI,'ui':{'resourceUri':URI,**({'visibility':['app']} if name!='open_run_review' else {})}}
+              if name in ('open_run_review','save_run_review','read_run_review','read_run_review_field','approve_run_review') else None)
+        server.tool(name=name,meta=meta,annotations=ToolAnnotations(readOnlyHint=name in read_only,destructiveHint=False,openWorldHint=False),structured_output=False)(wrap(method))
+    from .review_app import URI,MIME,html
+    @server.resource(URI,name='AnkiPlus source-linked review',mime_type=MIME,meta={'ui':{'csp':{'connectDomains':[],'resourceDomains':[]}}})
+    def review_resource():return html()
     return server

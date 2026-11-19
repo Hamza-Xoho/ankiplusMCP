@@ -34,6 +34,8 @@ class Proposal(Model):
     config: dict
     cards: list[dict]
     media: dict = Field(default_factory=dict)
+    review_selection: dict = Field(default_factory=dict)
+    review_cards: list[dict] = Field(default_factory=list)
     decisions: list[dict]
     operations: list[dict]
     quality: list[dict] = Field(default_factory=list)
@@ -204,18 +206,26 @@ class Coordinator(Application):
         latest={}
         for event in events:
             for decision in event.payload['decisions']:latest[decision['concept_id']]=decision
+        selected={}
+        for event in run.events:
+            if event.kind=='review_decision':
+                for decision in event.payload['decisions']:latest[decision['concept_id']]=decision
+                selected.update(event.payload['selected'])
         decisions=list(latest.values())
         selected_refs=[ref for d in decisions for ref in d['source_refs']]
         evidence=[]
         for start in range(0,len(selected_refs),20):evidence.extend(e.model_dump() for e in self.evidence.resolve(run.workspace,selected_refs[start:start+20]))
         return {'source':run.selection.model_dump(),'config':{k:getattr(config,k) for k in CONFIG_DEPENDENCIES},
-                'cards':cards,'media':media,'decisions':decisions,'evidence':evidence,
+                'cards':cards,'media':media,'decisions':decisions,'review_selection':selected,'evidence':evidence,
                 'coverage':[{k:e.payload[k] for k in ('batch_id','binding','query','notes')} for e in events]}
 
     def _latest(self,run_id):
         events=[e for e in self.runs.read(run_id).events if e.kind=='proposal_staged']
         if not events: raise DomainError('PROPOSAL','Stage this run first.')
-        return Proposal.model_validate(events[-1].payload['proposal'])
+        value=events[-1].payload['proposal']
+        if sha({k:v for k,v in value.items() if k!='digest'})!=value.get('digest'):
+            raise DomainError('RUN_CORRUPT','Stored proposal digest does not match its immutable contents.')
+        return Proposal.model_validate(value)
 
     def _quality(self,run_id,content_digest):
         reports={};accepted={}
@@ -238,6 +248,8 @@ class Coordinator(Application):
         with self.lock(run_id):
             inputs=self._inputs(run_id);run=self.runs.read(run_id)
             binding=inputs['coverage'][-1]['binding']
+            observed={n['note_id']:n for b in inputs['coverage'] for n in b['notes']}
+            review_cards=[]
             if self.unresolved(binding): raise DomainError('UNCERTAIN','Reconcile earlier writes before staging.')
             cards={c['id']:c for c in inputs['cards']};operations=[];findings=[]
             checked=self.s.check_cards(run.workspace)
@@ -246,7 +258,7 @@ class Coordinator(Application):
             for card in cards.values(): findings.extend(lint(card,tag_root=inputs['config']['tag_root']))
             async with self._connection() as adapter:
                 if await adapter.collection_identity()!=binding: raise DomainError('CONFLICT','Coverage belongs to another collection session; refresh it.')
-                used={m['filename']:m for d in inputs['decisions'] if d['disposition'] in ('propose_create','explicit_update')
+                used={m['filename']:m for d in inputs['decisions'] if d['disposition'] in ('propose_create','explicit_update') and inputs['review_selection'].get(d['concept_id'],True)
                       for m in (cards.get(d.get('draft_id')) or {}).get('media',[])}
                 total=0
                 for filename,m in sorted(used.items()):
@@ -261,6 +273,7 @@ class Coordinator(Application):
                         'operation':'store_media_file','arguments':args,'expected_state':state,'source_refs':[],
                         'concept_id':None,'draft_id':None,'tier':None})
                 for d in inputs['decisions']:
+                    if not inputs['review_selection'].get(d['concept_id'],True):continue
                     action=d['disposition'];card=cards.get(d.get('draft_id'))
                     if action in ('pending','already_covered'):continue
                     if action in ('propose_create','explicit_update') and card is None:
@@ -275,16 +288,32 @@ class Coordinator(Application):
                     elif action=='propose_unsuspend':op='card_unsuspend';args={'card_ids':d['card_ids']}
                     else:raise DomainError('COVERAGE','Unsupported coverage decision.')
                     state=await adapter.operation_state(op,args)
-                    if op in ('add_note','update_note_fields'):adapter.validate_note_type(state['target']['model'],args['fields'])
+                    if op in ('update_note_fields','card_unsuspend'):
+                        targets=[state['target']] if op=='update_note_fields' else state['target']
+                        for target in targets:
+                            prior=observed.get(target['id'])
+                            if not prior or target['fields']!=prior['fields'] or sorted(c['id'] for c in target['cards'])!=sorted(prior['card_ids']):
+                                raise DomainError('CONFLICT','Existing note content or card ownership changed since coverage; refresh the match.')
+                    if op in ('add_note','update_note_fields'):
+                        adapter.validate_note_type(state['target']['model'],args['fields'])
+                        review_cards.append({**card,'model':state['target']['model']})
+                    else:
+                        for target in state['target']:
+                            fields=target['fields']
+                            ident=(d.get('draft_id') or d['concept_id']) if len(state['target'])==1 else 'existing-'+sha({'concept':d['concept_id'],'nid':target['id']})[:24]
+                            review_cards.append({'id':ident,'fields':fields,'model':target['model'],'tags':target['tags'],
+                                'kind':'cloze' if any('{{c' in v for v in fields.values()) else 'basic','notetype':target['model']['name'],
+                                'note_id':target['id'],'action':'reuse','media':[]})
                     item={'id':sha({'concept':d['concept_id'],'operation':op,'arguments':args,'state':state})[:32],
                           'concept_id':d['concept_id'],'draft_id':d.get('draft_id'),'operation':op,'arguments':args,
                           'expected_state':state,'tier':card['tier'] if card else None,'source_refs':d['source_refs']}
                     operations.append(item)
+            if len({c['id'] for c in review_cards})!=len(review_cards):raise DomainError('COVERAGE','A draft cannot have multiple competing write decisions.')
             content={'inputs':inputs,'operations':operations,'findings':findings}
             content_digest=sha(content)
             quality=self._quality(run_id,content_digest)
             value=dict(run_id=run_id,content_digest=content_digest,inputs_digest=sha(inputs),source=inputs['source'],
-                config=inputs['config'],cards=inputs['cards'],media=inputs['media'],decisions=inputs['decisions'],operations=operations,
+                config=inputs['config'],cards=inputs['cards'],media=inputs['media'],review_selection=inputs['review_selection'],review_cards=review_cards,decisions=inputs['decisions'],operations=operations,
                 quality=quality,findings=findings,binding=binding)
             proposal=Proposal(**value,digest=sha(value))
             self.runs.save_snapshot(run_id,'proposal-'+proposal.digest,proposal.model_dump())

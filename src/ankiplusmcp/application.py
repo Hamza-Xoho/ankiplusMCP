@@ -37,6 +37,7 @@ class Application:
         if self.s._cards(run.workspace)!=p.cards:
             raise DomainError('STALE','Drafts changed since authorization.')
         config=self.config._current()[0]
+        if not config.onboarding_complete:raise DomainError('SETUP','Setup verification changed before dispatch.')
         if any(getattr(config,k)!=v for k,v in p.config.items()):raise DomainError('STALE','Relevant saved preferences changed since authorization.')
         snap=self.s.source_catalog.snapshot_locked(run.workspace)
         if snap.source_hash!=p.source['source_hash']:raise DomainError('SOURCE_CHANGED','Source changed since authorization.')
@@ -140,6 +141,9 @@ class Application:
     async def apply(self,run_id,proposal_digest):
         with self.lock(run_id):
             p=self._current(run_id,proposal_digest,quality=True)
+            from .onboarding import Onboarding
+            if not Onboarding(self.s).status().onboarding_complete:
+                raise DomainError('SETUP','Finish verified storage, connection, production review, quality-runtime and guide checks before application.')
             # Always repeat local quality enforcement; a human click never bypasses it.
             from .quality import validate_quality
             validate_quality(p)

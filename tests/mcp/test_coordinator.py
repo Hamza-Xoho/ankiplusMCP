@@ -20,7 +20,7 @@ class SyntheticCompanion:
         self.model={'name':'Basic','flds':[{'name':'Front'},{'name':'Back'}],'tmpls':[{'qfmt':'{{Front}}','afmt':'{{Back}}'}],'css':'.card{}'}
         self.notes={}; self.cards={}; self.media={}; self.queries=[]; self.sent=[]; self.drop=False; self.before_send=None
     async def list_tools(self):
-        return SimpleNamespace(tools=[SimpleNamespace(name=n) for n in ('collection_identity','find_notes','notes_info','student_operation_state','conditional_student_operation','read_media_file')])
+        return SimpleNamespace(tools=[SimpleNamespace(name=n) for n in ('collection_identity','find_notes','notes_info','student_operation_state','conditional_student_operation','read_media_file','model_field_names','model_templates','model_styling')])
     def note(self,nid):
         note=self.notes[nid]
         return dict(id=nid,fields=deepcopy(note['fields']),tags=note['tags'][:],model=deepcopy(self.model),mod=1,
@@ -32,7 +32,10 @@ class SyntheticCompanion:
         else: target=None
         return dict(version=1,operation=op,arguments=deepcopy(args),binding=deepcopy(self.binding),target=target)
     async def call_tool(self,name,args):
-        if name=='collection_identity': value=dict(self.binding,identity_complete=True)
+        if name=='model_field_names':value={'model_name':'Basic','field_names':['Front','Back']}
+        elif name=='model_templates':value={'model_name':'Basic','templates':{'Card 1':{'Front':'{{Front}}','Back':'{{Back}}'}}}
+        elif name=='model_styling':value={'model_name':'Basic','css':'.card{}'}
+        elif name=='collection_identity': value=dict(self.binding,identity_complete=True)
         elif name=='find_notes':
             self.queries.append(args['query']); value={'noteIds':list(self.notes),'hasMore':False}
         elif name=='notes_info':value={'notes':[{'noteId':nid,'fields':{k:{'value':v} for k,v in self.notes[nid]['fields'].items()},'cards':[c for c,v in self.cards.items() if v['nid']==nid]} for nid in args['notes'] if nid in self.notes]}
@@ -136,3 +139,29 @@ def test_student_facade_connects_run_coverage_and_stage(workflow):
     assert proposal['quality_required']
     assert api.get_run_proposal(r.id)['cards'][0]['fields']['Back']=='Fibroblasts'
     with pytest.raises(DomainError,match='QUALITY'):api.authorize_run(r.id,proposal['digest'],'user')
+
+
+def existing(workflow):
+    c,s,e,r,d=workflow
+    e.notes[101]={'fields':{'Front':'Existing question','Back':'Existing answer'},'tags':['Premade::Original']}
+    e.cards[201]=dict(id=201,nid=101,did=1,ord=0,queue=-1,type=0,due=0,mod=1,backend_sha256='b'*64)
+    d.update(disposition='propose_unsuspend',candidate_note_ids=[101],chosen_note_ids=[101],card_ids=[201])
+    covered(workflow)
+
+
+def test_stage_refuses_existing_note_changes_since_coverage(workflow):
+    c,s,e,r,d=workflow;existing(workflow)
+    e.notes[101]['fields']['Back']='Unreviewed foreign edit'
+    with pytest.raises(DomainError,match='CONFLICT'):run(c.stage(r.id))
+
+
+def test_modified_proposal_record_cannot_reuse_its_old_digest(workflow):
+    import json
+    from test_workflow_quality import quality_ready
+    c,s,e,r,d=workflow;covered(workflow);p=quality_ready(workflow)
+    event=next(e for e in reversed(c.runs.read(r.id).events) if e.kind=='proposal_staged')
+    path=c.runs._path(r.id)/(f'{event.sequence:020d}.json')
+    value=json.loads(path.read_bytes());value['payload']['proposal']['operations'][0]['arguments']['fields']['Back']='Forged content'
+    path.write_text(json.dumps(value))
+    with pytest.raises(DomainError,match='RUN_CORRUPT'):c.authorize(r.id,p.digest,'user')
+    assert not e.sent
