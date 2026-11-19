@@ -1,3 +1,9 @@
+> Historical checkpoint/evidence. Current connected-product scope, exact tested
+> revisions and ordered Mac acceptance are in [macos-acceptance.md](macos-acceptance.md)
+> and [t3-requirement-evidence.md](t3-requirement-evidence.md). Preserve the evidence
+> below; do not execute superseded host probes or treat old unfinished-scope lists
+> as the current implementation status. The known reviewer-control gate remains.
+
 # Student workflow acceptance
 
 First release includes the complete approved product scope and verified required fixes. No source change or test result below implies release readiness.

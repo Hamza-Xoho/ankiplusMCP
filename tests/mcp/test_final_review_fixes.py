@@ -119,6 +119,13 @@ def test_embedded_css_dependencies_refused_before_quality_browser(workflow,tmp_p
         with pytest.raises(DomainError,match='UNSUPPORTED'):QualityGate(c)._render(p,tmp_path/'render',r.workspace)
 
 
+def test_unimplemented_template_metadata_refuses_instead_of_empty_review(workflow,tmp_path):
+    c,s,e,r,d=workflow;covered(workflow);p=run(c.stage(r.id))
+    p.review_cards[0]['model']['tmpls'][0]['qfmt']='{{Deck}} {{Front}}'
+    with patch('cards.render.render_rows',side_effect=AssertionError('incomplete render entered')):
+        with pytest.raises(DomainError,match='UNSUPPORTED'):QualityGate(c)._render(p,tmp_path/'render',r.workspace)
+
+
 def test_expansion_bound_refuses_before_render_or_packet_allocation(workflow,monkeypatch):
     c,s,e,r,d=workflow
     cfg=c.config.read();c.config.confirm(c.config.propose({'note_type':'Cloze'},cfg.config_version).id)

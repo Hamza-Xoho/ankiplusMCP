@@ -154,6 +154,16 @@ class QualityGate:
             from .quality_models import refuse_css_dependencies,refuse_markup_dependencies
             refuse_css_dependencies(model['css'])
             for markup in list(fields.values())+[t[k] for t in model['tmpls'] for k in ('qfmt','afmt')]:refuse_markup_dependencies(markup)
+            for template in model['tmpls']:
+                for side in ('qfmt','afmt'):
+                    for spec in re.findall(r'\{\{([^{}]+)\}\}',template[side]):
+                        spec=spec.strip()
+                        if spec[:1] in ('#','^','/'):
+                            supported=spec[1:].strip() in fields
+                        else:
+                            parts=spec.split(':')
+                            supported=(len(parts)==1 and (spec in fields or spec=='Tags' or (spec=='FrontSide' and side=='afmt'))) or (len(parts)==2 and parts[0]=='cloze' and parts[1] in fields)
+                        if not supported:raise DomainError('UNSUPPORTED','This template uses metadata or filters whose rendering has not been verified.')
             from html.parser import HTMLParser
             from urllib.parse import unquote
             class References(HTMLParser):
@@ -172,10 +182,6 @@ class QualityGate:
                 if not numbers:raise DomainError('QUALITY','No renderable cloze is present.')
                 pairs=[]
                 for ordinal,template in enumerate(model['tmpls'],1):
-                    for markup in (template['qfmt'],template['afmt']):
-                        specs=re.findall(r'\{\{([^{}]+)\}\}',markup)
-                        if any(':' in spec and not spec.startswith('cloze:') for spec in specs):
-                            raise DomainError('UNSUPPORTED','This note type uses a filter whose rendering has not been verified.')
                     for n in numbers:
                         question=fill(template['qfmt'],fields,card['tags'],n,'front')
                         answer=fill(template['afmt'],fields,card['tags'],n,'back',question)

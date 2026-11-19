@@ -1,3 +1,9 @@
+> Historical checkpoint/evidence. Current connected-product scope, exact tested
+> revisions and ordered Mac acceptance are in [macos-acceptance.md](macos-acceptance.md)
+> and [t3-requirement-evidence.md](t3-requirement-evidence.md). Preserve the evidence
+> below; do not execute superseded host probes or treat old unfinished-scope lists
+> as the current implementation status. The known reviewer-control gate remains.
+
 # Assessment of the received Mac evidence
 
 Received 2026-11-19 against source `f795b56`. This is a cumulative assessment,

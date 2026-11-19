@@ -133,6 +133,7 @@ Mac lifecycle/collection behavior remain acceptance gates. Do not weaken them.
 The ordinary saved card profile can share a run with canonical native Image
 Occlusion. Existing/update reviews use actual model semantics and retained note
 tags. Native IO uses fractional rectangle masks; unsupported variants refuse.
+Unimplemented template metadata/filters refuse rather than render empty evidence.
 CSS-loaded resources (including inline/import/escaped forms) refuse before a
 dispatchable companion state or a quality render. Supply supported image fields
 instead; absent assets never become an accepted empty background.

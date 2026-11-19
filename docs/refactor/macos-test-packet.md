@@ -1,3 +1,9 @@
+> Historical checkpoint/evidence. Current connected-product scope, exact tested
+> revisions and ordered Mac acceptance are in [macos-acceptance.md](macos-acceptance.md)
+> and [t3-requirement-evidence.md](t3-requirement-evidence.md). Preserve the evidence
+> below; do not execute superseded host probes or treat old unfinished-scope lists
+> as the current implementation status. The known reviewer-control gate remains.
+
 # macOS compatibility test packet
 
 This packet prepares an investigation, not a release. Read `compatibility.md` and the approved student-workflows design first. Record exact Git SHA and clean/dirty status from `premacos-readiness.md`; use that reviewed source and its locally built wheel/npm tarball, never assume the remote v0.3.0 default includes these changes.

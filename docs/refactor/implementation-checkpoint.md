@@ -1,3 +1,9 @@
+> Historical checkpoint/evidence. Current connected-product scope, exact tested
+> revisions and ordered Mac acceptance are in [macos-acceptance.md](macos-acceptance.md)
+> and [t3-requirement-evidence.md](t3-requirement-evidence.md). Preserve the evidence
+> below; do not execute superseded host probes or treat old unfinished-scope lists
+> as the current implementation status. The known reviewer-control gate remains.
+
 # Native implementation checkpoint
 
 Work is on branch `refactor/student-workflows`, starting at `b0f4233`. The full approved design is not implemented and nothing is released, pushed or deployed. The older local checkout and the user's Anki collection are untouched.
