@@ -7,10 +7,13 @@ Task 3; it does not declare the full workflow implemented or accepted.
 
 ## Current continuation checkpoint
 
-The latest owner-pasted Mac report records Chat save/Reload/restart/stale-refusal
-and Reload recovery as passed, and confirms a current Code widget renders. Reuse
-those results with their provenance. Current Code save/Reload/restart is still
-unverified. The owner explicitly skipped collection of the historical
+The latest owner-pasted Mac report now records Code save/Reload/restart as passed,
+with matching display/readback at revision 4 (`code-test-save`, sample-b excluded).
+Chat save/Reload/restart/stale-refusal and recovery remain passed. Reuse those
+results rather than asking for more UI clicks. Continue with the
+[reviewer and companion evidence gates](macos-reviewer-companion-gates.md);
+the older Code test procedure below is retained for a genuinely new host test.
+The owner explicitly skipped collection of the historical
 post-restart Code error text: keep that field uncaptured and do not ask again.
 
 An existing `REVIEWER-ROUND1-20261119.md` is reported on the Mac. Inspect and

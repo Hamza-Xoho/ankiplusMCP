@@ -197,3 +197,30 @@ report. The continuation packet now reuses completed evidence, requests concise
 actual reviewer/companion summaries and prepares a bounded isolated-profile test
 plan without executing collection operations. The production compatibility gate
 remains open, including the known blind-recall limitation.
+
+## Reported Code round trip and remaining attribution gates
+
+The latest Mac report states Code save/Reload/restart passed: save advanced an
+observed revision-3 baseline to revision 4 with `code-test-save` selected and
+sample-b excluded; fresh Code display and readback retained that after a full
+restart. Reload is also reported passed. Raw evidence remains on the Mac and
+has not been independently inspected here. The earlier unexplained transition
+to revision 3 is retained as a prototype-observation provenance gap, not assigned
+a guessed cause; the log counts rejected save requests as well as accepted ones.
+
+Existing reviewer evidence now includes distinct reported agent IDs, matching
+round-1 report hashes and `PASS_WITH_FIXES` from each role. The maintainer caught
+the seeded source contradiction; the student flagged identical fronts. Those are
+execution/diagnostic findings, not passing card-quality verdicts. Actual runtime
+model/effort are not confirmed (only agent-definition values were supplied), and
+student inspection of every sheet is unconfirmed. Blind recall stays unverified.
+
+Two installed companion candidates were reported: Anki MCP Server and ColdRecall
+dev. Which one backs the active `mcp__anki__*` connection is not established.
+Advertised operations are not executed compatibility tests. The prior isolated
+outline lacks required media/update/duplicate/partial/interrupted-write cases and
+verified profile/companion attribution, so it is not a complete authorization
+packet. The [next evidence packet](macos-reviewer-companion-gates.md) audits
+existing transcripts, traces the actual companion without collection calls and
+requires a bounded, exact operation list before separate mutation authorization.
+Zero Anki operations remain reported; production integration is still gated.
