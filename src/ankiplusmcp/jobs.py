@@ -1,5 +1,6 @@
 """Persistent, cancellable jobs; owner leases distinguish restart from concurrency."""
 from concurrent.futures import ThreadPoolExecutor
+import re
 import uuid
 from filelock import FileLock, Timeout
 from .store import DomainError
@@ -53,6 +54,14 @@ class Jobs:
         if not ident or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in ident):
             raise DomainError('JOB', 'Invalid job ID.')
         record = self.store.read_json(workspace, f'jobs/{ident}.json')
+        if (not isinstance(record, dict) or record.get('id') != ident
+                or not isinstance(record.get('owner'), str)
+                or not re.fullmatch(r'[a-zA-Z0-9_-]{1,80}', record['owner'])
+                or record.get('status') not in ('queued','running','completed','cancelled','failed','interrupted')
+                or not isinstance(record.get('operation'), str)
+                or any(record.get(key) is not None and not isinstance(record[key], str)
+                       for key in ('created', 'updated', 'progress'))):
+            raise DomainError('JOB', 'Invalid job record; original retained.')
         if record['status'] in ('queued','running') and record['owner'] != self.owner:
             lease_path = self.store.root/f'.owner-{record["owner"]}.lock'
             if not lease_path.exists(): alive = False
@@ -78,14 +87,24 @@ class Jobs:
             raise DomainError('LIMIT','Use a nonnegative offset and a limit between 1 and 100.')
         if status is not None and status not in ('queued','running','completed','cancelled','failed','interrupted'):
             raise DomainError('JOB','Unknown job status.')
-        paths=list(self.store.path(workspace,'jobs').glob('*.json'))
-        records=[self.get(workspace,path.stem) for path in paths]
+        paths=sorted(self.store.path(workspace,'jobs').glob('*.json'))
+        records, errors = [], []
+        for path in paths:
+            try:
+                records.append(self.get(workspace,path.stem))
+            except (DomainError, OSError):
+                errors.append({'id':path.stem, 'code':'JOB_RECORD',
+                               'message':'Cannot read job record; original retained.'})
         records=[record for record in records if status is None or record['status']==status]
         records.sort(key=lambda record:(record.get('updated') or record.get('created') or '',record['id']),reverse=True)
         keys=('id','operation','status','created','updated','cancel_requested')
         summaries=[{**{key:record.get(key) for key in keys},'progress':str(record.get('progress',''))[:300]} for record in records[offset:offset+limit]]
         end=offset+limit
-        return {'jobs':summaries,'total':len(records),'next_offset':end if end<len(records) else None}
+        result = {'jobs':summaries,'total':len(records),
+                  'next_offset':end if end<max(len(records),len(errors)) else None}
+        if errors:
+            result.update(errors=errors[offset:offset+limit], error_total=len(errors))
+        return result
 
     def close(self):
         self.pool.shutdown(wait=True, cancel_futures=False)

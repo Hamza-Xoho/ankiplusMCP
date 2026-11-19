@@ -88,3 +88,27 @@ Additional execution rulings:
 The approved six-task supplement centralizes source discovery and native publication, hides run layout from indexing and adopts shared coverage batches after synthetic measurement met its 25% duplication gate. Historical event readers remain; no old history was rewritten. See `premacos-readiness.md` for revision-specific verification and `macos-test-packet.md` for the unpassed real-host gate. Earlier checkpoint evidence above is retained. Full product integration and private acceptance are still outstanding.
 
 Final source `290b246` passed 615 public-CI tests with the existing 25 skips, 382 check-mcp tests/one system-Chrome skip, all frozen hashes/42 hooks, unchanged 66-file/14-command golden, five synthetic rehearsal scenarios and source/evidence/history recovery regressions. Launcher remains 29/29. The single fresh review produced three material findings, all fixed with RED→GREEN tests. Exact logs and container outcome are in `premacos-readiness.md`; the real Mac/private acceptance gates are still open.
+
+## Inline continuation after 9e6cfb0
+
+The 2026-11-19 Linux resumption verified the clean isolated branch and fetched
+origin with no drift. Mac reviewer transcripts and active-companion
+registration/serverInfo/schema evidence remain unavailable from this host. The
+subsequent supplied report describes the gate instructions, not their execution;
+it establishes no new reviewer or companion result. Raw private evidence should
+remain in ignored Mac artifact locations; return sanitized findings with original
+paths/hashes rather than committing host configuration or private transcripts.
+The existing user-reported UI passes and earlier limitations remain as recorded
+in `compatibility.md`. No profile changes or collection operations were performed.
+
+Independent audit work repairs damaged-job discovery: malformed records no longer
+hide valid jobs, invalid owner identities are refused before probing leases, and
+original records remain intact. `list_jobs` retains its clean response shape;
+on damage it additionally returns bounded `errors` and `error_total`. The existing
+`offset`/`limit` page valid summaries and error summaries independently, with
+`next_offset` until both are exhausted; `total` still counts valid filtered jobs.
+This is partial A7/B3/E2 progress, not completion of those audit items or Task 12.
+Exact RED/GREEN and final verification evidence remain in the original plan ledger.
+Adapter/coordinator/UI/onboarding integration, further audit work and all required
+external acceptance remain incomplete. A complete payload-specific isolated-profile
+proposal requires the actual companion schemas before requesting authorization.
