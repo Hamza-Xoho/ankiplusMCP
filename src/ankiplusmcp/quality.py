@@ -190,6 +190,10 @@ class QualityGate:
                 clean=lambda text:page('',text,build,media).split("<div id='qa'>",1)[1].rsplit('</div></body>',1)[0]
                 if '</style' in model['css'].lower():raise DomainError('UNSUPPORTED','This note type contains unsupported embedded style markup.')
                 css='<style>'+model['css']+'</style>'
+                # Native Anki uses a responsive JS canvas. Its inert mask image
+                # needs the same phone-width containment, retaining original
+                # source bytes and mask resolution rather than cropping labels.
+                if kind=='io':css+='<style>#qa img{max-width:100%;height:auto}</style>'
                 rows.append({'id':card['id']+'_c'+str(ordinal),'question':css+clean(question),'answer':css+clean(answer)})
         return render_rows(rows,path/'renders',css='',browser=require_browser(self.c.s.browser),
             limits={'width':390,'height':12000,'pixels':24_000_000})

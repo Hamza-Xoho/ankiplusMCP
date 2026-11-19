@@ -66,9 +66,9 @@ def test_update_quality_renders_retained_actual_tags(workflow,tmp_path):
     assert '#AnkiPlus::Cells' not in rows[0]['question']
 
 
-def native_io(workflow):
+def native_io(workflow,size=(40,40)):
     c,s,e,r,d=workflow
-    b=io.BytesIO();Image.new('RGB',(40,40),'white').save(b,format='PNG');data=b.getvalue()
+    b=io.BytesIO();Image.new('RGB',size,'white').save(b,format='PNG');data=b.getvalue()
     e.media['label.png']=data
     fields={'Image':'<img src="label.png">','Occlusion':'{{c1::image-occlusion:rect:left=.1:top=.1:width=.2:height=.2:oi=1}}','Header':'','Back Extra':'','Comments':''}
     e.model={'name':'Image Occlusion','type':1,'flds':[{'name':n} for n in fields],
@@ -92,6 +92,14 @@ def test_existing_native_io_quality_masks_front(workflow,tmp_path):
     with Image.open(io.BytesIO(base64.b64decode(encoded))) as front:
         assert front.getpixel((8,8))[:3]==(255,220,110)
     assert 'data-ordinal="1"' in rows[0]['question']
+
+
+def test_native_io_review_fits_phone_without_resizing_source(workflow):
+    c,s,e,r,d=workflow;existing(workflow);e.notes[101]['fields']=native_io(workflow,(600,360))
+    original=e.media['label.png'];covered(workflow);p=run(c.stage(r.id))
+    ticket=QualityGate(c).prepare(r.id,p.content_digest,'student')
+    assert ticket['tile_ids']==['fibroblast_c1']
+    assert e.media['label.png']==original
 
 
 def test_native_io_create_allowed_with_normal_saved_profile(workflow):

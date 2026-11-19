@@ -186,7 +186,8 @@ async def main(package_name):
                         if mixed_state['status'] not in ('queued','running'):break
                         await asyncio.sleep(.02)
                     assert mixed_state['status']=='completed'
-                    mixed_asset=await call('import_image',{'workspace':mixed_workspace,'path':str(root/'update.png')})
+                    Image.new('RGB',(600,360),'white').save(root/'mixed.png')
+                    mixed_asset=await call('import_image',{'workspace':mixed_workspace,'path':str(root/'mixed.png')})
                     mixed_cards=[{'id':'mixedbasic','kind':'basic','notetype':'Basic','fields':{'Front':'What does this synthetic diagram identify?','Back':'Nucleus'},'deck':'Default','tags':['#AnkiPlus::Mixed'],'source_ref':[1]},
                         {'id':'diagram','kind':'io','notetype':'Image Occlusion','fields':{'Occlusion':'{{c1::image-occlusion:rect:left=.1:top=.1:width=.2:height=.2:oi=1}}','Image':'<img src="mixed-native.png">','Header':'Synthetic nucleus','Back Extra':'','Comments':''},'deck':'Default','tags':['#AnkiPlus::Mixed'],'source_ref':[1],'media':[{'path':mixed_asset['artifact'],'filename':'mixed-native.png'}]}]
                     await call('save_cards',{'workspace':mixed_workspace,'cards':mixed_cards,'expected_revision':0})
