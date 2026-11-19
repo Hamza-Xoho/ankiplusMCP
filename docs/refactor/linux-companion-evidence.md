@@ -57,3 +57,33 @@ it is absent from the installed Mac add-on. No Mac installation/restart/change i
 authorized here. ColdRecall type compatibility, live HTTP/auth attribution,
 production apply/recovery and Desktop staged continuation remain open. Successful
 Linux probes and 867 unit tests do not finish the student product.
+
+## Checkpoint revisions and engineering review
+
+Companion commits: c86403b (identity/freshness/media) and bcde97d (isolated packaged
+checks). A clean bcde97d image also passed import and both synthetic package-name
+runs. Image ID: sha256:167afa2561ae1b16e9bbe52d3f9bbbe4fcd798bbd2e331b90e63d8094ddca6bf.
+The clean image records bcde97d in its OCI source label. Archive hashes and
+complete dependency environments are retained with the raw evidence.
+
+One fresh whole-branch engineering reviewer inspected primary b0f4233..4963722
+and companion278f5e9..bcde97d, independently passing105primary and42companion
+focused tests. It found one Important implementation defect: concurrent first
+history reads could race SQLite schema migration and crash with duplicate column
+name journal_token. Two real-connection regressions reproduced it for fresh and
+legacy indexes, then passed after schema inspection/DDL were serialized inside
+BEGIN IMMEDIATE. Failed connections are closed, not silently ignored.
+
+Post-fix full AnkiPlus public-mode suite:644passed25existing skips; check-mcp:
+411passed1existing skip, frozenhashes12/12, hooks42/42, wheel/version/privacy and
+unchanged66artifact14command golden. Launcher42/42 and lockfile checks passed in
+this session; their inputs were unchanged by the index fix. NoCritical/Minor
+implementation finding was reported, and no re-review was substituted for the
+regression-tested fix. The reviewer explicitly retains all missing product scope
+and real-platform/private-quality acceptance as required work.
+
+Companion push was attempted with the configured GitHub credential and refused
+403: account binaryzer0 has pull:true/push:false on that repository. The two
+commits remain local pending repository write access; no authorization bypass,
+visibility change, fork or alternate repository was attempted. The same account
+has push:true on the primary repository.

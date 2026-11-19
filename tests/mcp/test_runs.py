@@ -155,3 +155,44 @@ def test_malformed_historical_run_is_reported_without_hiding_other_history(tmp_p
     assert [run.id for run in page.runs] == [good.id]
     assert page.errors[bad.id] == 'RUN_CORRUPT'
     assert path.exists(), 'damaged evidence must be preserved'
+
+
+@pytest.mark.parametrize('legacy', [False, True])
+def test_concurrent_first_history_reads_migrate_index_once(tmp_path, monkeypatch, legacy):
+    """Two real SQLite connections must not race an old-schema column upgrade."""
+    import sqlite3
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier, BrokenBarrierError
+    from ankiplusmcp.run_index import RunIndex, RunQuery
+    m = api()
+    store = m.RunStore(tmp_path)
+    run = store.start('lecture1', selection(), 1)
+    index = RunIndex(store)
+    if legacy:
+        with sqlite3.connect(index.path) as db:
+            db.execute('CREATE TABLE runs (id TEXT PRIMARY KEY, source_hash TEXT, label TEXT, updated TEXT, sequence INTEGER, snapshot TEXT NOT NULL)')
+    # Hold each reader's actual old-schema result until both have inspected it.
+    # A serialized implementation cannot reach the second inspection yet; the
+    # bounded barrier then releases the first reader to finish its transaction.
+    inspected = Barrier(2)
+    original_connect = sqlite3.connect
+    class CoordinatedConnection(sqlite3.Connection):
+        def execute(self, sql, *args, **kwargs):
+            cursor = super().execute(sql, *args, **kwargs)
+            if sql == 'PRAGMA table_info(runs)':
+                rows = list(cursor)
+                try:
+                    inspected.wait(timeout=0.5)
+                except BrokenBarrierError:
+                    pass
+                return rows
+            return cursor
+    def connect(*args, **kwargs):
+        return original_connect(*args, factory=CoordinatedConnection, **kwargs)
+    monkeypatch.setattr(sqlite3, 'connect', connect)
+    def search(_):
+        return [item.id for item in RunIndex(m.RunStore(tmp_path)).search(RunQuery()).runs]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(search, range(2)))
+    assert results == [[run.id], [run.id]]
+    assert store.read(run.id).events == run.events

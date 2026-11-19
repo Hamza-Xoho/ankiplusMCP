@@ -37,15 +37,23 @@ class RunIndex:
         if self.path.is_symlink():
             raise DomainError('RUN', 'Index cannot be a symbolic link.')
         db = sqlite3.connect(self.path)
-        db.execute('CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, source_hash TEXT, label TEXT, updated TEXT, sequence INTEGER, snapshot TEXT NOT NULL)')
-        db.execute('CREATE TABLE IF NOT EXISTS lookups (run_id TEXT, kind TEXT, value TEXT, PRIMARY KEY(run_id,kind,value))')
-        db.execute('CREATE INDEX IF NOT EXISTS runs_source ON runs(source_hash)')
-        db.execute('CREATE INDEX IF NOT EXISTS runs_recency ON runs(updated DESC,id)')
-        db.execute('CREATE INDEX IF NOT EXISTS lookup_value ON lookups(kind,value,run_id)')
-        db.execute('CREATE TABLE IF NOT EXISTS index_errors (id TEXT PRIMARY KEY, code TEXT)')
-        db.execute('CREATE TABLE IF NOT EXISTS journal_watermarks (id TEXT PRIMARY KEY, sequence INTEGER NOT NULL)')
-        if 'journal_token' not in {row[1] for row in db.execute('PRAGMA table_info(runs)')}:
-            db.execute('ALTER TABLE runs ADD COLUMN journal_token TEXT')
+        try:
+            # Serialize schema inspection and migration across connections/processes.
+            # DDL is transactional only when a transaction is explicitly begun.
+            with db:
+                db.execute('BEGIN IMMEDIATE')
+                db.execute('CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, source_hash TEXT, label TEXT, updated TEXT, sequence INTEGER, snapshot TEXT NOT NULL)')
+                db.execute('CREATE TABLE IF NOT EXISTS lookups (run_id TEXT, kind TEXT, value TEXT, PRIMARY KEY(run_id,kind,value))')
+                db.execute('CREATE INDEX IF NOT EXISTS runs_source ON runs(source_hash)')
+                db.execute('CREATE INDEX IF NOT EXISTS runs_recency ON runs(updated DESC,id)')
+                db.execute('CREATE INDEX IF NOT EXISTS lookup_value ON lookups(kind,value,run_id)')
+                db.execute('CREATE TABLE IF NOT EXISTS index_errors (id TEXT PRIMARY KEY, code TEXT)')
+                db.execute('CREATE TABLE IF NOT EXISTS journal_watermarks (id TEXT PRIMARY KEY, sequence INTEGER NOT NULL)')
+                if 'journal_token' not in {row[1] for row in db.execute('PRAGMA table_info(runs)')}:
+                    db.execute('ALTER TABLE runs ADD COLUMN journal_token TEXT')
+        except BaseException:
+            db.close()
+            raise
         return db
 
     def _sync(self, db, *, reset=False):
