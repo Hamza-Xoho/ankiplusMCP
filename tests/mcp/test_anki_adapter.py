@@ -126,3 +126,26 @@ def test_note_type_reads_reject_malformed_or_foreign_metadata(adapter, damage):
     for name,value in [('model_field_names',fields),('model_templates',templates),('model_styling',styling)]:
         c.handlers[name]=lambda args,value=value:value
     with pytest.raises(DomainError): run(a.read_note_type('Basic'))
+
+
+@pytest.mark.parametrize('bad_result', [{}, {'note_id':None}, {'note_id':True}, {'note_id':0}, {'note_id':-1}, {'note_id':'17'}])
+def test_malformed_create_acknowledgement_stops_batch(adapter, bad_result):
+    a,c=adapter
+    binding=run(a.collection_identity())
+    model={'name':'Basic','flds':[{'name':'Front'},{'name':'Back'}],
+           'tmpls':[{'qfmt':'{{Front}}','afmt':'{{FrontSide}} {{Back}}'}],'css':''}
+    batch=[]
+    for front in ('valid','damaged','must not send'):
+        args={'deck_name':'Default','model_name':'Basic','fields':{'Front':front,'Back':'answer'},'tags':[]}
+        batch.append({'arguments':args,'expected_state':{'version':1,'operation':'add_note','arguments':args,'binding':binding,'target':{'model':model,'deck':{'id':1,'name':'Default'}}}})
+    sent=[]
+    def write(args):
+        front=args['arguments']['fields']['Front']
+        sent.append(front)
+        return {'version':1,'binding':binding,'result':{'note_id':17} if front=='valid' else bad_result}
+    c.handlers['conditional_student_operation']=write
+    results=run(a.create_notes(batch))
+    assert [r['status'] for r in results]==['acknowledged','uncertain']
+    assert results[0]['acknowledgement']['result']['note_id']==17
+    assert results[1]['code']=='PROTOCOL'
+    assert sent==['valid','damaged']

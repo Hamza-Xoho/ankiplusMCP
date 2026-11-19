@@ -189,6 +189,8 @@ class AnkiAdapter:
         result = await self.dispatch(operation, arguments, state)
         if result.get('version') != 1 or result.get('binding') != state.get('binding') or not isinstance(result.get('result'), dict):
             raise DomainError('PROTOCOL', 'Write acknowledgement is incomplete; reconcile before retrying.')
+        if operation == 'add_note' and (type(result['result'].get('note_id')) is not int or result['result']['note_id'] <= 0):
+            raise DomainError('PROTOCOL', 'Created note identity is missing or invalid; reconcile before retrying.')
         return result
 
     async def store_media(self, media):
