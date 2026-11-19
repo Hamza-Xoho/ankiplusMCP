@@ -13,7 +13,7 @@ revisions identify all runtime source being accepted. Do not use the older
 AnkiPlus checkout, historical v0.3.0 registry/Git tag or candidate7523cd0 archives.
 
 Local packet directory:
-`/home/shakeel/projects/ankiplusmcp-refactor/.artifacts/mac-acceptance/0fef80e/`.
+`.artifacts/mac-acceptance/0fef80e/` relative to the primary checkout.
 It contains the following actual files, `manifest.json` and `SHA256SUMS`. Transfer
 this directory through an owner-approved channel; no publication is required.
 No credentials, real collections, private documents or verifier keys are included.
