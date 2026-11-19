@@ -6,7 +6,7 @@ colors:
   surface: "#f2f5f4"
   ink: "#172a24"
   muted: "#4b6159"
-  line: "#a6b7b0"
+  line: "#6c8379"
   accent: "#155940"
   focus: "#925100"
   error: "#9c2525"
@@ -97,12 +97,12 @@ Focus uses a 3px outline with 3px offset. Form controls retain native semantics.
 
 ## Components
 
-Buttons expose hover, active, focus, disabled and busy states. The page announces
+Buttons expose hover, active, focus, disabled and busy states. Unsaved edits disable approval, paging and recheck; a save locks editing until its result returns. An explicit reload returns to retained state. The page announces
 status politely and marks main content busy during calls. Every field/control has
 a label. Existing-note update requires choosing the target and checking an explicit
 confirmation. A source-disagreement resolution has its own explicit checkbox.
 
-Source and existing-coverage sections expose origin, page/section and OCR labels.
+Source and existing-coverage sections expose origin, page/section and OCR labels. A cited PDF page opens inline through the current bound review; PNGs fit the panel and have descriptive source/page alternative text.
 Findings are inspectable with full retained evidence available through history.
 Long fields load complete bounded slices before editing. Stale/offline errors
 retain saved decisions and tell the student to reopen/recheck. Empty review state

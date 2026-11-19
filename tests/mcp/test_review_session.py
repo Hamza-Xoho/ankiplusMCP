@@ -102,3 +102,28 @@ def test_complete_main_field_slice_for_existing_card_uses_the_displayed_note(wor
     value=sessions.field(r.id,page['session_token'],'fibroblast','Back')
     assert value['text'].startswith('existing answer existing answer')
     assert value['next_offset']==4000
+
+
+def test_selected_existing_note_remains_visible_beyond_the_first_candidate_page(workflow):
+    from copy import deepcopy
+    from test_coordinator import existing
+    from ankiplusmcp.review_session import ReviewSession
+    c,s,e,r,d=workflow;existing(workflow)
+    for nid in (102,103,104):
+        e.notes[nid]={'fields':{'Front':str(nid),'Back':'Other candidate'},'tags':['Premade::Original']}
+        e.cards[nid+100]={**deepcopy(e.cards[201]),'id':nid+100,'nid':nid}
+    d['candidate_note_ids']=[102,103,104,101];covered(workflow)
+    page=run(ReviewSession(c).open(r.id))
+    assert page['items'][0]['existing_notes'][0]['note_id']==101
+    assert len(page['items'][0]['existing_notes'])<=3
+
+
+def test_keep_without_content_changes_preserves_exact_quality_and_proposal(workflow):
+    from test_workflow_quality import quality_ready
+    from ankiplusmcp.review_session import ReviewSession
+    c,s,e,r,d=workflow;covered(workflow);p=quality_ready(workflow)
+    sessions=ReviewSession(c);page=run(sessions.open(r.id))
+    kept=run(sessions.decide(r.id,page['session_token'],page['digest'],[{'concept_id':'fibroblast','action':'keep'}]))
+    assert kept['quality_status']=='ready'
+    assert c._latest(r.id).digest==p.digest
+    assert not e.sent

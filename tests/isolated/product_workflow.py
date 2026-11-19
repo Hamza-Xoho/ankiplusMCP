@@ -56,8 +56,20 @@ async def main(package_name):
             parameters=StdioServerParameters(command=sys.executable,args=['/artifact/companion_stdio.py',str(root),package_name],env={**os.environ,'PYTHONPATH':'/artifact/companion-runtime'})
             async with stdio_client(parameters) as (read,write),ClientSession(read,write) as companion_client:
                 await companion_client.initialize()
+                dispatch_run=None;dispatch_digest=None;dispatches=[]
+                class ObservedClient:
+                    async def list_tools(self):return await companion_client.list_tools()
+                    async def call_tool(self,name,args):
+                        if name=='conditional_student_operation':
+                            assert dispatch_run and dispatch_digest
+                            assert any(event.kind=='operation_intent' and event.payload['proposal_digest']==dispatch_digest
+                                and event.payload['operation']==args['operation'] and event.payload['arguments']==args['arguments']
+                                and event.payload['expected_state']==args['expected_state'] for event in c.runs.read(dispatch_run).events)
+                            dispatches.append({'run_id':dispatch_run,'operation':args['operation']})
+                        return await companion_client.call_tool(name,args)
+                observed=ObservedClient()
                 @asynccontextmanager
-                async def connection():yield AnkiAdapter(companion_client,profile='Synthetic',collection_path=str(root/'collection.anki2'))
+                async def connection():yield AnkiAdapter(observed,profile='Synthetic',collection_path=str(root/'collection.anki2'))
                 service.companion_connection=connection
                 async with create_connected_server_and_client_session(create_server(service)) as client:
                     calls=[]
@@ -111,6 +123,7 @@ async def main(package_name):
                     await call('advance_student_setup',{'step':'interactive_review','evidence':evidence})
                     setup=await call('advance_student_setup',{'step':'guide','evidence':{}});assert setup['ready_to_apply'],setup
                     await call('authorize_run',{'run_id':run_id,'proposal_digest':p['digest'],'mode':'user'})
+                    dispatch_run=run_id;dispatch_digest=p['digest']
                     result=await call('apply_run',{'run_id':run_id,'proposal_digest':p['digest']});assert result['counts']['notes_created']==1 and result['counts']['cards_suspended']==1,result
                     nid=result['results'][0]['note_ids'][0];cid=result['results'][0]['card_ids'][0]
                     async with connection() as adapter:
@@ -123,10 +136,48 @@ async def main(package_name):
                     await call('record_run_coverage',{'run_id':second['id'],'query':'collagen','decisions':[decision]})
                     next_p=await call('stage_run',{'run_id':second['id']});assert next_p['operations']==0 and next_p['pending']==1
                     history=await call('get_run_history',{'run_id':run_id});assert any(e['kind']=='operation_intent' for e in history['events'])
+                    async def passing_quality(target,staged):
+                        for role in ('maintainer','student'):
+                            ticket=await call('prepare_run_quality',{'run_id':target,'content_digest':staged['content_digest'],'role':role})
+                            receipt=synthetic_receipt(ticket,role)
+                            if role=='student':await call('release_review_backs',{'run_id':target,'content_digest':staged['content_digest'],'ticket_id':ticket['ticket_id'],'attempts':receipt['attempts']})
+                            receipt['attestation']=hmac.new(key,_encoded({'run_id':target,'content_digest':staged['content_digest'],'receipt':receipt}),hashlib.sha256).hexdigest()
+                            await call('submit_run_quality',{'run_id':target,'content_digest':staged['content_digest'],'receipt':receipt})
+                        return await call('stage_run',{'run_id':target})
+                    # Explicit reuse of the known suspended card verifies real
+                    # card IDs; editing its note retains existing tags/scheduling.
+                    reuse=await call('start_student_run',{'workspace':workspace,'pages':[1]})
+                    reuse_decision={**decision,'disposition':'propose_unsuspend','candidate_note_ids':[nid],'chosen_note_ids':[nid],'card_ids':[cid]}
+                    await call('record_run_coverage',{'run_id':reuse['id'],'query':'collagen','decisions':[reuse_decision]})
+                    reuse_p=await passing_quality(reuse['id'],await call('stage_run',{'run_id':reuse['id']}))
+                    await call('authorize_run',{'run_id':reuse['id'],'proposal_digest':reuse_p['digest']})
+                    dispatch_run=reuse['id'];dispatch_digest=reuse_p['digest']
+                    reuse_result=await call('apply_run',{'run_id':reuse['id'],'proposal_digest':reuse_p['digest']})
+                    assert reuse_result['counts']['cards_unsuspended']==1,reuse_result
+                    from PIL import Image
+                    Image.new('RGB',(24,24),'white').save(root/'update.png')
+                    asset=await call('import_image',{'workspace':workspace,'path':str(root/'update.png')})
+                    manifest=await call('get_workspace',{'workspace':workspace})
+                    await call('patch_cards',{'workspace':workspace,'expected_revision':manifest['revision'],'patches':[{'id':'fibroblast','changes':{
+                        'action':'update','note_id':nid,'card_ids':[cid],'tier':1,
+                        'fields':{'Back':'Fibroblasts <img src="synthetic-product.png">'},
+                        'media':[{'path':asset['artifact'],'filename':'synthetic-product.png'}]}}]})
+                    updating=await call('start_student_run',{'workspace':workspace,'pages':[1]})
+                    update_decision={**reuse_decision,'disposition':'explicit_update'}
+                    await call('record_run_coverage',{'run_id':updating['id'],'query':'collagen','decisions':[update_decision]})
+                    update_p=await passing_quality(updating['id'],await call('stage_run',{'run_id':updating['id']}))
+                    await call('authorize_run',{'run_id':updating['id'],'proposal_digest':update_p['digest']})
+                    dispatch_run=updating['id'];dispatch_digest=update_p['digest']
+                    update_result=await call('apply_run',{'run_id':updating['id'],'proposal_digest':update_p['digest']})
+                    assert update_result['counts']['notes_updated']==1 and all(row['status']=='confirmed' for row in update_result['results']),update_result
+                    async with connection() as adapter:
+                        assert (await adapter.read_notes([nid]))[0].fields['Back']=='Fibroblasts <img src="synthetic-product.png">'
+                        media=await adapter.read_media('synthetic-product.png')
+                        assert media['sha256']==hashlib.sha256((root/'update.png').read_bytes()).hexdigest()
                     # Fault injection loses a real accepted acknowledgement, then
                     # restarts the primary stores. The child still owns real Anki.
                     manifest=await call('get_workspace',{'workspace':workspace})
-                    await call('patch_cards',{'workspace':workspace,'patches':[{'id':'fibroblast','changes':{'fields':{'Front':'Where is collagen made?'},'tier':1}}],'expected_revision':manifest['revision']})
+                    await call('patch_cards',{'workspace':workspace,'patches':[{'id':'fibroblast','changes':{'action':'create','note_id':None,'card_ids':[],'media':[],'fields':{'Front':'Where is collagen made?','Back':'Fibroblasts'},'tier':1}}],'expected_revision':manifest['revision']})
                     third=await call('start_student_run',{'workspace':workspace,'pages':[1]});third_id=third['id']
                     another={**decision,'concept_id':'second-synthetic-concept'}
                     await call('record_run_coverage',{'run_id':third_id,'query':'collagen','decisions':[another]})
@@ -140,22 +191,25 @@ async def main(package_name):
                     third_p=await call('stage_run',{'run_id':third_id})
                     await call('authorize_run',{'run_id':third_id,'proposal_digest':third_p['digest'],'mode':'user'})
                     class LostAcknowledgement:
-                        async def list_tools(self):return await companion_client.list_tools()
+                        async def list_tools(self):return await observed.list_tools()
                         async def call_tool(self,name,args):
-                            response=await companion_client.call_tool(name,args)
+                            response=await observed.call_tool(name,args)
                             if name=='conditional_student_operation' and not response.isError:raise TimeoutError('LOCAL FAULT: lost real acknowledgement')
                             return response
                     @asynccontextmanager
                     async def lossy():yield AnkiAdapter(LostAcknowledgement(),profile='Synthetic',collection_path=str(root/'collection.anki2'))
                     service.companion_connection=lossy
+                    dispatch_run=third_id;dispatch_digest=third_p['digest']
                     uncertain=await call('apply_run',{'run_id':third_id,'proposal_digest':third_p['digest']})
                     assert uncertain['counts']['uncertain_operations']==1,uncertain
+                    sent_before_restart=len(dispatches)
                     fresh=Service(root/'workspaces',[root],browser='chromium');fresh.companion_connection=connection
                     try:
                         recovered=await Coordinator(fresh).reconcile(third_id)
                         assert recovered['counts']['uncertain_operations']==1
                         replayed=await Coordinator(fresh).apply(third_id,third_p['digest'])
                         assert replayed['counts']['uncertain_operations']==1
+                        assert len(dispatches)==sent_before_restart
                         async with connection() as adapter:assert len(await adapter.search_notes('tag:#AnkiPlus::*'))==2
                     finally:fresh.close()
                     # Actual OCR and local inert Chromium helpers in the same
@@ -174,7 +228,7 @@ async def main(package_name):
                     assert ocr['status']=='completed' and ocr['result']['region_count']>0,ocr
                     print(json.dumps({'status':'passed','synthetic_only':True,'quality_execution':'SIGNED SYNTHETIC FIXTURE, NOT REVIEWER ACCEPTANCE',
                         'primary':importlib.metadata.version('ankiplusmcp'),'companion_archive_sha256':hashlib.sha256(Path('/artifact/companion.ankiaddon').read_bytes()).hexdigest(),'anki':importlib.metadata.version('anki'),
-                        'package':package_name,'counts':result['counts'],'restart_uncertain':True,'ocr_regions':ocr['result']['region_count'],'calls':calls},indent=2))
+                        'package':package_name,'verified_note_id':nid,'verified_card_id':cid,'intent_before_every_send':True,'conditional_dispatches':dispatches,'counts':result['counts'],'restart_uncertain':True,'notes_updated':update_result['counts']['notes_updated'],'cards_unsuspended':reuse_result['counts']['cards_unsuspended'],'media_verified':True,'ocr_regions':ocr['result']['region_count'],'calls':calls},indent=2))
         finally:
             service.close()
 

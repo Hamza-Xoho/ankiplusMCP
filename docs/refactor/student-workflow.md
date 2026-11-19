@@ -39,8 +39,10 @@ media uploads use supplied bytes only; conflicting existing names refuse.
 ## Review, quality and permission
 
 `open_run_review` serves the packaged ext-apps 2.0.4 App. It pages through actual
-run state, source passages and existing candidates; local decisions survive
-reconnect. Shortened fields must be completely loaded before editing. Stale
+run state, source passages, viewable cited PDF pages and existing candidates; local decisions survive
+reconnect. Unsaved edits block approval/paging/recheck, while a pending save locks
+editing; unchanged Keep preserves the exact quality/proposal binding. Application
+status includes pending decisions and unsent operations. Shortened fields must be completely loaded before editing. PDF images are read through a session/digest/concept/reference-bound App tool, never an arbitrary supplied file or page. Stale
 proposal/session tokens refuse, and changes invalidate affected quality and
 approval. The App displays source disagreement, technical and reviewer findings.
 Existing-note field editing defaults to a new adapted draft.

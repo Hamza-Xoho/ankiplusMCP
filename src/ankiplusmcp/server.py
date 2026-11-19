@@ -226,6 +226,13 @@ class API:
         from .review_session import ReviewSession
         return ReviewSession(self._coordinator()).field(run_id,session_token,concept_id,name,note_id,offset)
 
+    def read_run_review_source_image(self, run_id: str, session_token: str, expected_review_digest: str,
+                                    concept_id: str, reference_index: Offset) -> CallToolResult:
+        """Read the actual cited PDF page as a bounded image from this current bound review. No arbitrary path/page access."""
+        from .review_session import ReviewSession
+        data=ReviewSession(self._coordinator()).source_image(run_id,session_token,expected_review_digest,concept_id,reference_index)
+        return CallToolResult(content=[ImageContent(type='image',mimeType='image/png',data=base64.b64encode(data).decode())])
+
     async def save_run_review(self, run_id: str, session_token: str, expected_proposal_digest: str, decisions: list[dict]) -> dict:
         """Save run-only review decisions, invalidate affected approval/quality, and revalidate the proposal."""
         from .review_session import ReviewSession
@@ -437,7 +444,7 @@ async def resolve_roots(server, store):
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='AnkiPlus student workflows with source evidence and permanent run history. Use the durable student run tools for collection application: approved-scope coverage, immutable stage, independent quality evidence, exact authorization, conditional apply and read-only reconciliation. Setup must be verified. Mechanical workspace tools remain available. Caller-supplied legacy receipts never establish verified application. Companion access requires explicit connection configuration.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
-    read_only={'get_collection_choices','get_run_results','get_run_history','read_run_record','list_student_runs','read_run_review','read_run_review_field','get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
+    read_only={'read_run_review_source_image','get_collection_choices','get_run_results','get_run_history','read_run_record','list_student_runs','read_run_review','read_run_review_field','get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):
         if name.startswith('_'): continue
         def wrap(method):
@@ -461,7 +468,7 @@ def create_server(service):
             return invoke
         from .review_app import URI
         meta=({'ui/resourceUri':URI,'ui':{'resourceUri':URI,**({'visibility':['app']} if name!='open_run_review' else {})}}
-              if name in ('open_run_review','save_run_review','read_run_review','read_run_review_field','approve_run_review') else None)
+              if name in ('open_run_review','save_run_review','read_run_review','read_run_review_field','read_run_review_source_image','approve_run_review') else None)
         server.tool(name=name,meta=meta,annotations=ToolAnnotations(readOnlyHint=name in read_only,destructiveHint=False,openWorldHint=False),structured_output=False)(wrap(method))
     from .review_app import URI,MIME,html
     @server.resource(URI,name='AnkiPlus source-linked review',mime_type=MIME,meta={'ui':{'csp':{'connectDomains':[],'resourceDomains':[]}}})

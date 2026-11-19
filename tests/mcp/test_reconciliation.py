@@ -189,3 +189,17 @@ def test_all_covered_run_records_conflict_when_note_changes_after_coverage(workf
     result=run(c.apply(r.id,p.digest))
     assert result['counts']['conflict_operations']==1
     assert not e.sent
+
+
+def test_tier_three_mapping_stays_pending_when_followup_never_sent(workflow):
+    c,s,e,r,d=workflow;s.patch_cards(r.workspace,[{'id':'fibroblast','changes':{'tier':3}}],1)
+    p=approved(workflow);original=e.call_tool
+    async def offline(name,args):
+        if name=='student_operation_state' and args['operation']=='card_suspend':raise TimeoutError()
+        return await original(name,args)
+    e.call_tool=offline;first=run(c.apply(r.id,p.digest))
+    assert first['counts']['failed_operations']==1 and e.cards[201]['queue']==0
+    e.call_tool=original
+    second=c.start(r.workspace,[1]);run(c.coverage(second.id,'collagen',[d]));next_p=run(c.stage(second.id))
+    assert next_p.decisions[0]['disposition']=='pending'
+    assert not next_p.operations and len(e.notes)==1

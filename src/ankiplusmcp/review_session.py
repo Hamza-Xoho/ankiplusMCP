@@ -57,7 +57,8 @@ class ReviewSession:
                 value=e.model_dump();value['quote_truncated']=len(value.get('quote') or '')>300
                 value['quote']=(value.get('quote') or '')[:300];value['reference_index']=number;refs.append(value)
             existing=[]
-            for nid in d['candidate_note_ids'][:3]:
+            candidate_order=list(dict.fromkeys(d['chosen_note_ids']+d['candidate_note_ids']))
+            for nid in candidate_order[:3]:
                 note=notes[nid];values,short=self._fields(note['fields'],budget=3000)
                 existing.append({**note,'fields':values,'truncated_fields':short})
             rows=[]
@@ -105,6 +106,21 @@ class ReviewSession:
         if name not in fields:raise DomainError('REVIEW','Unknown field.')
         value=fields[name]
         return {'text':value[offset:offset+limit],'next_offset':offset+limit if offset+limit<len(value) else None,'digest':version}
+
+    def source_image(self,run_id,token,expected_review_digest,concept_id,reference_index):
+        run=self._validate_session(run_id,token)
+        _,inputs,version,_=self._view(run_id)
+        if version!=expected_review_digest:raise DomainError('STALE','This source view changed; reload the saved review.')
+        decision=next((d for d in inputs['decisions'] if d['concept_id']==concept_id),None)
+        if decision is None:raise DomainError('REVIEW','Unknown review item.')
+        refs=decision['source_refs']
+        if type(reference_index) is not int or not 0<=reference_index<len(refs):raise DomainError('SOURCE_REF','Unknown source reference.')
+        evidence=self.c.evidence.resolve(run.workspace,[refs[reference_index]])[0]
+        if evidence.location_kind!='pdf_page':raise DomainError('SOURCE_REF','This reference is a text section, not a PDF page.')
+        asset=self.c.s.get_page_image(run.workspace,evidence.page)
+        data=self.c.s.image_bytes(run.workspace,asset['artifact'])
+        if self._view(run_id)[2]!=version:raise DomainError('STALE','The review changed while loading its source page; reload it.')
+        return data
 
     async def decide(self,run_id,session_token,expected_proposal_digest,decisions):
         with self.c.lock(run_id),self.c.collection_lock(self.c._latest(run_id).binding):

@@ -192,9 +192,8 @@ class Coordinator(Application,RunPreferences,SourceConflicts):
                         if note.fields!=mappings[-1]['fields']:
                             d.disposition='pending';d.uncertain=True;d.pending_reason='prior_mapping_changed';continue
                         d.candidate_note_ids=d.chosen_note_ids=[nid];d.card_ids=note.card_ids[:]
-                        if note.suspended_card_ids:
-                            if mappings[-1].get('tier')==3:d.disposition='pending'
-                            else:d.disposition='propose_unsuspend';d.card_ids=note.suspended_card_ids[:]
+                        if mappings[-1].get('tier')==3:d.disposition='pending'
+                        elif note.suspended_card_ids:d.disposition='propose_unsuspend';d.card_ids=note.suspended_card_ids[:]
                         else:d.disposition='already_covered'
                     batch=uuid4().hex
                     snapshot=CollectionSnapshot(collection_id=binding['identity_sha256'],query=query,notes=notes)
@@ -228,6 +227,7 @@ class Coordinator(Application,RunPreferences,SourceConflicts):
             raise DomainError('SCOPE','Approved search scope changed; refresh collection coverage before staging.')
         events=[e for e in events if e.payload.get('scope')==scope]
         decisions=list(latest.values())
+        selected={d['concept_id']:selected.get(d['concept_id'],True) for d in decisions}
         pending=self.pending_conflicts(decisions,workspace=run.workspace)
         for d in decisions:
             if pending[d['concept_id']]:d['source_disagreement']=True;d['disposition']='pending'

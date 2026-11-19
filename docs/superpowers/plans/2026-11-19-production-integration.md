@@ -137,3 +137,17 @@ packaged companion and disposable Anki collection. Quality and observed-host
 receipts are explicitly signed synthetic fixtures, never actual reviewer passes.
 The path covers guarded refusal, successful real-ID readback/tier suspension,
 replay, prior mappings and lost-real-acknowledgement restart without blind resend.
+
+## Cited-image review interface supplement
+
+The App's `read_run_review_source_image` takes only run/session/current-review
+digest/concept/reference index, validates the exact retained EvidenceRef and
+returns one existing bounded PNG ImageContent. It accepts no arbitrary file or
+page. Native rendering runs with source-captured short publication locks, then
+rechecks the review digest. The App displays an inert data:PNG with source/page
+alternative text, responsive width, explicit load action and late-result refusal.
+The image-only PDF source fixture exercises the real App SDK and real PDF renderer.
+MCP optional null fields are omitted in the synthetic bridge exactly as on the
+actual SDK wire. Human errors use the structured error message, not raw JSON.
+Selected known notes remain visible ahead of other bounded candidate previews.
+Field-boundary contrast is measured in the browser and must be at least 3:1.

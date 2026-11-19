@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-19T19:03:25.109734+00:00",
+  "generatedAt": "2026-11-19T19:56:56.102269+00:00",
   "title": "Design System: AnkiPlus student review",
   "extensions": {
     "breakpoints": [
@@ -26,7 +26,52 @@
     ],
     "provenance": "Extracted from the implemented review surface; no generated or sourced shipping raster assets."
   },
-  "components": [],
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Save a decision or apply a validated proposal.",
+      "html": "<button class=\"ds-primary\">Save decision</button>",
+      "css": ".ds-primary{min-height:44px;padding:9px 15px;border:1px solid var(--accent);border-radius:6px;font:inherit;cursor:pointer;background:var(--accent);color:var(--button-ink)}.ds-primary:hover:enabled{filter:brightness(.92)}.ds-primary:focus-visible{outline:3px solid var(--focus);outline-offset:3px}.ds-primary:active:enabled{transform:translateY(1px)}.ds-primary:disabled{opacity:.55;cursor:default}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Reopen retained state or inspect cited evidence.",
+      "html": "<button class=\"ds-secondary\">View PDF page</button>",
+      "css": ".ds-secondary{min-height:44px;padding:9px 15px;border:1px solid var(--accent);border-radius:6px;font:inherit;cursor:pointer;background:var(--paper);color:var(--accent)}.ds-secondary:hover:enabled{filter:brightness(.92)}.ds-secondary:focus-visible{outline:3px solid var(--focus);outline-offset:3px}.ds-secondary:disabled{opacity:.55;cursor:default}"
+    },
+    {
+      "name": "Card field",
+      "kind": "input",
+      "description": "Labelled inert text, with explicit local save.",
+      "html": "<label class=\"ds-label\" for=\"ds-back\">Back</label><textarea class=\"ds-field\" id=\"ds-back\">Card text</textarea>",
+      "css": ".ds-label{display:block;font-weight:600;margin:12px 0 5px}.ds-field{width:100%;padding:10px;border:1px solid var(--line);border-radius:5px;background:var(--paper);color:var(--ink);font:inherit;min-height:100px;resize:vertical;caret-color:var(--accent)}.ds-field:focus-visible{outline:3px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Decision selection",
+      "kind": "input",
+      "description": "Native explicit keep, exclude or defer choice.",
+      "html": "<label class=\"ds-label\" for=\"ds-decision\">Decision</label><select class=\"ds-select\" id=\"ds-decision\"><option>Keep proposal</option><option>Exclude from this run</option><option>Leave pending</option></select>",
+      "css": ".ds-label{display:block;font-weight:600;margin:12px 0 5px}.ds-select{width:100%;padding:10px;min-height:44px;border:1px solid var(--line);border-radius:5px;background:var(--paper);color:var(--ink);font:inherit}.ds-select:focus-visible{outline:3px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Evidence disclosure",
+      "kind": "custom",
+      "description": "Expand existing coverage or unresolved findings.",
+      "html": "<details class=\"ds-disclosure\"><summary>Existing coverage</summary><p>Retained note and card evidence.</p></details>",
+      "css": ".ds-disclosure{border-top:1px solid var(--line);margin-top:12px}.ds-disclosure summary{cursor:pointer;padding:10px 0;min-height:44px}.ds-disclosure summary:focus-visible{outline:3px solid var(--focus);outline-offset:3px}"
+    },
+    {
+      "name": "Source panel",
+      "kind": "custom",
+      "description": "Cited text and optional bounded PNG source-page view.",
+      "html": "<aside class=\"ds-source\"><h2>Source evidence</h2><p>Source filename and page.</p></aside>",
+      "css": ".ds-source{background:var(--surface);color:var(--ink);padding:18px;border-radius:8px}.ds-source h2{font-size:1.2rem;margin:0 0 12px}.ds-source p{max-width:70ch;overflow-wrap:anywhere}"
+    }
+  ],
   "narrative": {
     "northStar": "Compare a proposal with its evidence before changing a collection.",
     "overview": "A restrained source-linked editor with explicit local save, current quality evidence and exact approval.",

@@ -29,9 +29,9 @@ ANKIPLUS_REVISION=<primary-sha> COMPANION_REVISION=<companion-sha> \
 
 The script exercises actual installed SDK/MCP tools, source extraction, scoped
 coverage, source-linked session state, quality refusal/acceptance mechanics,
-verified setup, guarded real-note creation, generated-card suspension/readback,
+verified setup, guarded real-note creation, generated-card suspension/unsuspension, supplied media upload, explicit full-field update and readback,
 replay, mapping reuse, real accepted-acknowledgement loss, fresh primary recovery
-without resending, permanent history and actual Tesseract OCR. The production
+without resending, permanent history and actual Tesseract OCR. The real dispatch boundary asserts exact durable intent before every send. The production
 review bundle is loaded through resources/read; its browser interactions and
 accessibility have a separate real-SDK browser test in test_review_app.py.
 
