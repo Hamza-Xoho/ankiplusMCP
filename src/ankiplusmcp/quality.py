@@ -121,24 +121,35 @@ class QualityGate:
         from PIL import Image
         import io,base64
         pixels=0;media_bytes=0
-        embedded=[]
+        from html.parser import HTMLParser
+        from cards.render.templates import fill
+        class Images(HTMLParser):
+            def __init__(self):super().__init__();self.sources=set()
+            def parse(self,markup):self.reset();self.feed(markup);self.close()
+            def handle_starttag(self,tag,attrs):
+                if tag=='img':self.sources.update(v for k,v in attrs if k=='src' and v and v.lower().startswith('data:'))
+        refs=Images()
         for card in proposal.review_cards:
-            for text in card['fields'].values():
-                embedded.extend(re.findall(r'data:image/(?:png|jpeg|gif|webp);base64,([a-z0-9+/=]+)',text,re.I))
+            for text in card['fields'].values():refs.parse(text)
+            for template in card['model']['tmpls']:
+                front=fill(template['qfmt'],card['fields'],card['tags'],1,'front')
+                refs.parse(front);refs.parse(fill(template['afmt'],card['fields'],card['tags'],1,'back',front))
         images=[]
         for media in proposal.media.values():
             path=self.c.s.store.path(self.c.runs.read(proposal.run_id).workspace,media['path'])
             media_bytes+=path.stat().st_size;images.append(path)
         if html_bytes+media_bytes*rows*2>64*1024*1024:
             raise DomainError('LIMIT','Narrow the quality selection; inlined media expansion exceeds rendering limits.')
-        for encoded in embedded:
-            try:images.append(io.BytesIO(base64.b64decode(encoded,validate=True)))
+        for source in refs.sources:
+            match=re.fullmatch(r'data:image/(?:png|jpeg|gif|webp);base64,([a-z0-9+/=\s]+)',source,re.I)
+            if not match:raise DomainError('UNSUPPORTED','Embedded quality image format is unsupported.')
+            try:images.append(io.BytesIO(base64.b64decode(re.sub(r'\s','',match[1]),validate=True)))
             except ValueError:raise DomainError('UNSUPPORTED','Embedded quality image bytes are invalid.') from None
         for image_source in images:
             try:
                 with Image.open(image_source) as image:
                     count=image.width*image.height;pixels+=count
-                    if count>4_000_000 or pixels>24_000_000:raise DomainError('LIMIT','Narrow/resize quality media before allocating images.')
+                    if count>4_000_000 or pixels*max(rows,1)>24_000_000:raise DomainError('LIMIT','Narrow/resize quality media or mask expansion before allocating images.')
             except Image.DecompressionBombError:raise DomainError('LIMIT','Quality image dimensions exceed safe allocation limits.') from None
             except (OSError,ValueError):raise DomainError('UNSUPPORTED','Quality media must be a supported readable image.') from None
 

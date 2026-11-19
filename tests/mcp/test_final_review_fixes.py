@@ -102,6 +102,14 @@ def test_native_io_review_fits_phone_without_resizing_source(workflow):
     assert e.media['label.png']==original
 
 
+def test_native_mask_expansion_is_bounded_before_rasterization(workflow,monkeypatch):
+    c,s,e,r,d=workflow;existing(workflow);fields=native_io(workflow,(600,360))
+    fields['Occlusion']=' '.join('{{c%d::image-occlusion:rect:left=.1:top=.1:width=.2:height=.2:oi=1}}'%n for n in range(1,121))
+    e.notes[101]['fields']=fields;covered(workflow);p=run(c.stage(r.id));gate=QualityGate(c)
+    monkeypatch.setattr(gate,'_render',lambda *a:(_ for _ in ()).throw(AssertionError('expensive raster entered')))
+    with pytest.raises(DomainError,match='LIMIT'):gate.prepare(r.id,p.content_digest,'student')
+
+
 def test_native_io_create_allowed_with_normal_saved_profile(workflow):
     c,s,e,r,d=workflow;fields=native_io(workflow)
     asset=s.store.path(r.workspace,'label.png');asset.write_bytes(e.media['label.png'])
@@ -181,6 +189,20 @@ def test_embedded_image_dimensions_checked_before_mask_or_browser(workflow,monke
     def chunk(kind,data):return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data))
     png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!IIBBBBB',5000,5000,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b'\0'))+chunk(b'IEND',b'')
     s.patch_cards(r.workspace,[{'id':'fibroblast','changes':{'fields':{'Back':'<img src="data:image/png;base64,'+base64.b64encode(png).decode()+'">'}}}],1)
+    covered(workflow);p=run(c.stage(r.id));gate=QualityGate(c)
+    monkeypatch.setattr(gate,'_render',lambda *a:(_ for _ in ()).throw(AssertionError('expensive render entered')))
+    with pytest.raises(DomainError,match='LIMIT'):gate.prepare(r.id,p.content_digest,'student')
+
+
+@pytest.mark.parametrize('location',['field','template','other_field_open_tag'])
+def test_embedded_image_whitespace_and_template_headers_are_bounded(workflow,monkeypatch,location):
+    import struct,zlib
+    c,s,e,r,d=workflow
+    def chunk(kind,data):return struct.pack('!I',len(data))+kind+data+struct.pack('!I',zlib.crc32(kind+data))
+    png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('!IIBBBBB',5000,5000,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(b'\0'))+chunk(b'IEND',b'')
+    markup='<img src="data:image/png;base64, \n'+base64.b64encode(png).decode()+'">'
+    if location!='template':s.patch_cards(r.workspace,[{'id':'fibroblast','changes':{'fields':({'Back':'<script>inert','Front':markup} if location=='other_field_open_tag' else {'Back':markup})}}],1)
+    else:e.model['tmpls'][0]['qfmt']=markup+'{{Front}}'
     covered(workflow);p=run(c.stage(r.id));gate=QualityGate(c)
     monkeypatch.setattr(gate,'_render',lambda *a:(_ for _ in ()).throw(AssertionError('expensive render entered')))
     with pytest.raises(DomainError,match='LIMIT'):gate.prepare(r.id,p.content_digest,'student')
