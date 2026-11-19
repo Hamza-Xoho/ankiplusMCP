@@ -155,3 +155,20 @@ stale-decision refusal. Use two freshly rendered working views, confirm their
 starting revisions and verify an actual rejected stale save. Latest Code-surface
 error, content-channel behavior, independent reviewer execution and the companion
 gates remain outstanding. A Chat pass does not establish a combined Code workflow.
+
+## Reported Chat stale-refusal pass
+
+The owner pasted the next Mac report: two fresh Chat widgets began at revision
+1; Chat-1 saved `stale-test-A` at revision 2 with matching server readback.
+Chat-2 still displayed revision 1/`Mac test edit` when its `stale-test-B` attempt
+was refused as stale. Readback stayed at revision 2 with A's text and sample-b
+excluded. Stale refusal passed according to that Mac evidence; zero Anki operations
+were reported. Raw files remain on the Mac and have not been inspected here.
+
+The disabled Save button after refusal is intentional until Reload fetches fresh
+state; recovery after that Reload still needs observation. Duplicated stale-error
+wording is a cosmetic limitation. Earlier delayed save feedback, old-conversation
+restore failure and Code rendering failure remain separate open observations.
+Use the [post-Chat continuation](macos-post-chat-probe.md) to capture the current
+Code outcome and continue actual fresh reviewers, advertised companion discovery
+and channel measurement without repeating the passed Chat cases.

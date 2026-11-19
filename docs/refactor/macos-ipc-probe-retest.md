@@ -167,3 +167,7 @@ collected separately from relevant logs and a fresh Code opener attempt, asking
 the owner only for visible error text when the agent cannot inspect it. Preserve
 reported successes and failures separately; no production or Anki operation is
 authorized by these probe results.
+
+After a real stale refusal and unchanged server readback, use the
+[post-Chat continuation](macos-post-chat-probe.md) for Reload recovery and the
+remaining independent compatibility stages. Keep earlier UI failures in the record.
