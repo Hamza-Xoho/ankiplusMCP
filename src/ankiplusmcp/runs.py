@@ -11,6 +11,7 @@ from filelock import FileLock, Timeout
 
 from .run_models import EventRecord, Run, RunEvent, RunSnapshot, SourceSelection, RunCatalog, RunProjection
 from .store import DomainError
+from .receipts import read_receipts
 
 
 def _identifier(value: str) -> str:
@@ -134,8 +135,7 @@ class RunStore:
         with FileLock(self.directory / '.imports.lock', timeout=5):
             for path in plans:
                 plan = read(path) if path else None
-                results_path = path.parent / 'external-results.json' if path else None
-                results = read(results_path) if results_path and results_path.exists() else None
+                results = read_receipts(path.parent, read) if path else None
                 evidence = {'workspace': workspace, 'manifest': manifest, 'plan': plan, 'results': results,
                             'legacy_plan_id': path.parent.name if path else None}
                 key = hashlib.sha256(_encoded(evidence)).hexdigest()

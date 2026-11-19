@@ -36,3 +36,19 @@ def test_legacy_cards_workspace_does_not_invent_source_hash(tmp_path):
     assert run.selection.source_hash is None
     assert run.config_version is None
     assert run.events[-1].kind == 'legacy_import'
+
+
+def test_import_preserves_old_projection_shape_and_identity(tmp_path):
+    from ankiplusmcp.runs import RunStore
+    legacy = tmp_path / 'legacy'
+    plan = legacy / 'write/plan1'
+    plan.mkdir(parents=True)
+    (legacy / 'workspace.json').write_text('{"id":"w1","source":null}')
+    (plan / 'plan.json').write_text('{"created":1}')
+    original = {'results': [{'operation': 'create', 'status': 'success', 'note_ids': [101]}]}
+    (plan / 'external-results.json').write_text(json.dumps(original))
+    store = RunStore(tmp_path / 'history')
+    run = store.import_legacy('w1', legacy)[0]
+    snapshots = list((store.directory / run.id / 'snapshots').glob('*.json'))
+    assert len(snapshots) == 1
+    assert json.loads(snapshots[0].read_text())['results'] == original

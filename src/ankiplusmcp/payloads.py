@@ -1,11 +1,11 @@
 """Prepare Anki arguments and record caller evidence; never contact Anki."""
 from collections import defaultdict
-import json
 import uuid
 from .models import ExternalResult
 from .store import DomainError, digest
 from .runs import _publish
 from .run_models import utc_now
+from .receipts import read_receipts
 
 class Payloads:
     def prepare_write(self, workspace, expected_revision, ids=None):
@@ -67,24 +67,25 @@ class Payloads:
             if plan['cards_sha256']!=digest(self.store.path(workspace,'cards.json')): raise DomainError('STALE','Write plan is stale.','Reconcile actual Anki results before preparing another plan.')
             relative=f'write/{plan_id}/external-results.json'
             receipt_path=self.store.path(workspace,relative)
-            previous=self.store.read_json(workspace,relative).get('results',[]) if receipt_path.is_file() else []
             journal=self.store.path(workspace,f'write/{plan_id}/result-events')
             journal.mkdir(exist_ok=True)
             # Publish recording intent before updating the compatibility projection.
             # Replaying journals recovers a crash between these two publications.
             number=max((int(path.stem) for path in journal.glob('[0-9]'*20+'.json')),default=0)+1
             _publish(journal/(f'{number:020d}.json'),{'sequence':number,'timestamp':utc_now(),'results':parsed,'evidence_origin':'caller_supplied','independently_verified':False})
-            combined=[]; seen=set()
-            groups=[previous]+[self.store.read_json(workspace,str(path.relative_to(self.store.directory(workspace))))['results'] for path in sorted(journal.glob('*.json'))]
-            for group in groups:
-                for result in group:
-                    key=json.dumps(result,sort_keys=True,ensure_ascii=False,allow_nan=False)
-                    if key not in seen:
-                        seen.add(key); combined.append(result)
-            _publish(receipt_path,{'results':combined,'evidence_origin':'caller_supplied','independently_verified':False})
+            _publish(receipt_path, {**self._read_receipts(workspace, receipt_path.parent),
+                                   'evidence_origin':'caller_supplied','independently_verified':False})
         return {'revision':state['revision'],'recorded':len(parsed),'evidence_origin':'caller_supplied','independently_verified':False}
 
     def get_report(self, workspace):
+        with self.store.lock(workspace):
+            return self._get_report_locked(workspace)
+
+    def _read_receipts(self, workspace, directory):
+        return read_receipts(directory, lambda path: self.store.read_json(
+            workspace, str(path.relative_to(self.store.directory(workspace)))))
+
+    def _get_report_locked(self, workspace):
         path=self.store.path(workspace,'latest-plan.json')
         report={'workspace':workspace,'revision':self.store.get(workspace)['revision'],'cards':len(self._cards(workspace)),
                 'reported_successes':0,'reported_failures':0,'ambiguous':0,'evidence_origin':'caller_supplied','independently_verified':False,'performed_anki_operations':0}
@@ -93,7 +94,8 @@ class Payloads:
             report['planned']={'created':plan['created'],'updated':plan['updated']}
             report['plan_stale']=plan['cards_sha256']!=digest(self.store.path(workspace,'cards.json'))
             receipts=self.store.path(workspace,f'write/{plan["plan_id"]}/external-results.json')
-            if receipts.exists():
-                results=self.store.read_json(workspace,str(receipts.relative_to(self.store.directory(workspace))))['results']
+            evidence=self._read_receipts(workspace, receipts.parent)
+            if evidence is not None:
+                results=evidence['results']
                 report.update(reported_successes=sum(r['status']=='success' for r in results),reported_failures=sum(r['status']=='failed' for r in results),ambiguous=sum(r['status']=='ambiguous' for r in results))
         return report
