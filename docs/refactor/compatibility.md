@@ -172,3 +172,28 @@ restore failure and Code rendering failure remain separate open observations.
 Use the [post-Chat continuation](macos-post-chat-probe.md) to capture the current
 Code outcome and continue actual fresh reviewers, advertised companion discovery
 and channel measurement without repeating the passed Chat cases.
+
+## Current Code render and channel observation
+
+The latest owner-pasted Mac report confirms current Code rendering and Chat
+Reload recovery. Code save/Reload/restart remain untested. The owner explicitly
+requested skipping the historical post-restart Code error text; retain it as
+uncaptured rather than asking for it again or rewriting earlier failed results.
+
+One fresh Chat called the channel probe once and quoted the structured marker
+`copper` without quoting text marker `indigo`; the raw result contains both. This
+is an observation of the model's response, not proof that the host never delivered
+text. Host filtering and model omission remain indistinguishable here. Both
+production response channels remain unchanged; text-forwarding/context-loading
+measurement stays unverified. A further manual repeat may remain pending while
+independent functional/provenance work proceeds; no channel removal or byte/token
+savings are claimed.
+
+The Mac report references `REVIEWER-ROUND1-20261119.md` but supplied no per-reviewer
+verdict, actual model/effort, agent identity or isolation transcript in this message.
+Those must be inspected from the existing Mac artifacts before calling reviewer
+execution verified. Companion discovery results were also not supplied in this
+report. The continuation packet now reuses completed evidence, requests concise
+actual reviewer/companion summaries and prepares a bounded isolated-profile test
+plan without executing collection operations. The production compatibility gate
+remains open, including the known blind-recall limitation.
