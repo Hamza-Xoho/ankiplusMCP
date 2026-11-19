@@ -90,6 +90,60 @@ class API:
         return {'binding':binding,'query':query,'notes':[n.model_dump() for n in notes],
                 'evidence_origin':'companion_readback','semantic_completeness_verified':False}
 
+    def _coordinator(self):
+        from .coordinator import Coordinator
+        return Coordinator(self.s)
+
+    def start_student_run(self, workspace: Workspace, pages: list[Annotated[int,Field(ge=1)]] | None=None) -> dict:
+        """Start a durable run for this source selection, preserving all earlier runs."""
+        return self._coordinator().start(workspace,pages).model_dump()
+
+    async def record_run_coverage(self, run_id: str, query: str, decisions: list[dict]) -> dict:
+        """Read complete approved-scope collection coverage and retain source-linked decisions durably."""
+        result=await self._coordinator().coverage(run_id,query,decisions)
+        return {'batch_id':result['batch_id'],'recorded':len(result['decisions']),'query':result['query']}
+
+    async def stage_run(self, run_id: str) -> dict:
+        """Capture an immutable exact proposal and its conditional collection preconditions. Does not approve or write."""
+        p=await self._coordinator().stage(run_id)
+        return {'run_id':run_id,'digest':p.digest,'content_digest':p.content_digest,'operations':len(p.operations),
+                'pending':sum(d['disposition']=='pending' for d in p.decisions),'quality_required':not bool(p.quality)}
+
+    def get_run_proposal(self, run_id: str, offset: Offset=0, limit: Limit=10) -> dict:
+        """Read a bounded page of proposed cards, actions, source evidence and unresolved findings."""
+        p=self._coordinator()._latest(run_id)
+        return {'run_id':run_id,'digest':p.digest,'content_digest':p.content_digest,'source':p.source,
+                'cards':p.cards[offset:offset+limit],'decisions':p.decisions[offset:offset+limit],
+                'findings':p.findings[offset:offset+limit],'total':len(p.cards),
+                'next_offset':offset+limit if offset+limit<len(p.cards) else None}
+
+    def authorize_run(self, run_id: str, proposal_digest: str, mode: Literal['user','config']='user') -> dict:
+        """Authorize this exact validated proposal; quality checks apply to both user and configuration authorization."""
+        return self._coordinator().authorize(run_id,proposal_digest,mode).model_dump()
+
+    def prepare_run_quality(self, run_id: str, content_digest: str, role: Literal['maintainer','student']) -> dict:
+        """Prepare unchanged reviewer instructions and exact source/render inputs. Never claims reviewer execution."""
+        from .quality import QualityGate
+        return QualityGate(self._coordinator()).prepare(run_id,content_digest,role)
+
+    def release_review_backs(self, run_id: str, content_digest: str, ticket_id: str, attempts: dict) -> dict:
+        """Durably commit every front attempt before releasing student back images. Does not establish host budget support."""
+        from .quality import QualityGate
+        return QualityGate(self._coordinator()).release(run_id,content_digest,ticket_id,attempts)
+
+    def submit_run_quality(self, run_id: str, content_digest: str, receipt: dict) -> dict:
+        """Validate a trusted host-verifier attested execution receipt. Caller pass assertions are never accepted."""
+        from .quality import QualityGate
+        return QualityGate(self._coordinator()).submit(run_id,content_digest,receipt)
+
+    async def apply_run(self, run_id: str, proposal_digest: str) -> dict:
+        """Apply only an exactly authorized, quality-validated proposal with durable per-item intent and readback."""
+        return await self._coordinator().apply(run_id,proposal_digest)
+
+    async def reconcile_run(self, run_id: str) -> dict:
+        """Read back uncertain intents by known identities; never resend creates or roll back collection data."""
+        return await self._coordinator().reconcile(run_id)
+
     def get_guidance(self, topic: Literal['overview','quality','maintainer','student']='overview') -> dict:
         """Read optional workflow examples or card/reviewer guidance. No prescribed tool sequence."""
         from cards.review.packets import TEMPLATES
@@ -278,7 +332,7 @@ async def resolve_roots(server, store):
 def create_server(service):
     server=FastMCP('ankiplusmcp', instructions='Mechanical helper toolkit. Choose tools according to the user request. The official Anki MCP is a separate host dependency for all collection reads/writes. Optional get_guidance explains examples; no mandatory pipeline.')
     server._mcp_server.version=importlib.metadata.version('ankiplusmcp')
-    read_only={'get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
+    read_only={'get_run_proposal','get_student_setup','search_collection_coverage','capabilities','get_guidance','list_workspaces','get_workspace','read_source','search_source','get_source_evidence','list_figures','get_figure','resolve_target','get_cards','check_cards','prepare_review','get_report','list_artifacts','read_artifact','get_image','get_job','list_jobs'}
     for name,method in inspect.getmembers(API(service),predicate=inspect.ismethod):
         if name.startswith('_'): continue
         def wrap(method):

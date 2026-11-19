@@ -84,3 +84,31 @@ against the captured model, not a model name alone. Unsupported/empty/malformed
 model metadata fails closed. Tests: partial fields and nonmatching model/style
 refuse; fixed suspension mapping; no arbitrary dispatch; batch partial results.
 Expected: focused adapter tests pass, then full check-mcp and frozen CLI checks.
+
+## Durable workflow interface supplement (resume)
+
+`Coordinator(service)` owns RunStore/ConfigStore under `.student-workflows` and
+uses only `service.companion_connection`. `start(workspace, pages)` captures source
+selection; `coverage(run_id, query, decisions)` scopes balanced Anki query syntax
+to saved deck names/IDs plus the configured generated-card tag namespace, records
+full coherent note/card snapshots and normalized EvidenceResolver decisions.
+Prior confirmed mappings are reread before reuse. Earlier unresolved intents in
+this collection block new coverage/staging until reconciliation.
+
+`stage(run_id)` is async and captures conditional states into immutable Proposal
+snapshots; `authorize(run_id, digest, mode)` is synchronous, rereads all local
+inputs and quality bindings, and records either human or explicit saved-policy
+authorization. Stage/apply/reconcile use dedicated nonblocking cross-process locks.
+Proposal content binds selected drafts, decisions, source selection/evidence,
+media content, relevant preference values and fixed operation requests/states.
+Quality receipts bind the content digest; proposal digest additionally binds the
+accepted receipts. Missing/failed/stale host execution evidence refuses authorize.
+No public input can mark a quality result independently verified.
+
+Per-operation immutable intent is fsynced before dispatch. Acknowledgements and
+readback outcomes are separate cumulative events. Creates journal their returned
+note identity before any readback; tier3 suspension resolves actual generated card
+IDs after fields/media verification. Intent without a known identity remains
+uncertain after restart; known IDs permit bounded readback only. No create search
+can by itself manufacture provenance or trigger a resend. Tests cover these
+interfaces with real stores, source extraction and transport-only synthetic Anki.
