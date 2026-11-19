@@ -91,3 +91,20 @@ Registration-fix verification: ten focused tests passed; `check-mcp.sh` passed
 392 tests with its one existing skip, all frozen hashes/42 hooks, wheel/version/
 privacy checks and the unchanged 66-file/14-command CLI golden. No production
 module, launcher dependency or container build input changed in this fix.
+
+## Observed widget bridge failure
+
+The owner subsequently supplied the widget error
+`IPC not available for MCP tool call`. Together with the Mac agent's revision-0
+readback and absent save observation, this establishes that saving failed through
+the tested Code-managed route while initial embedded rendering succeeded.
+
+The exact symptom is reported in
+[Anthropic's issue tracker](https://github.com/anthropics/claude-code/issues/106708).
+Independent contributor tests there report that Desktop-managed stdio registration
+can forward widget calls in Code and Chat. This is a candidate workaround, not
+verified on the owner's Mac. The [scoped retest packet](macos-ipc-probe-retest.md)
+backs up configurations, preserves the same server/data, removes only the owned
+project-local duplicate and tests Desktop-owned registration. There is no claim
+that changing models or repeatedly clicking Save repairs this bridge. Production
+UI/coordinator contracts remain gated; restart persistence has not passed.

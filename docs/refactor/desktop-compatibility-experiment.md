@@ -117,6 +117,12 @@ Invoke `open_sample_review` through the probe, then have the owner:
 4. Open two views at the same revision. Save one; saving the other must show
    `STALE` and leave the first result intact. Reload and confirm the latest state.
 
+If Save reports `IPC not available for MCP tool call`, preserve the exact error
+and server log/state evidence. Stop repeating the unchanged test and follow the
+[Desktop-owned registration retest](macos-ipc-probe-retest.md). The reported Mac
+rendered the view from a Code-managed registration but its save did not reach
+the server; a reported upstream workaround is a candidate to test, not a pass.
+
 If no embedded view is available in a surface, capture the actual failure and
 mark it blocked. Do not expose a public Anki endpoint or substitute an external
 web page and call it an embedded pass. A Chat UI pass plus a Code reviewer pass
