@@ -1,32 +1,77 @@
 ---
 name: ankiplusmcp
-description: Use AnkiPlus MCP mechanical helpers for lecture extraction, OCR, image occlusions, card checks, previews, and review changes alongside the official Anki MCP.
+description: Use when selecting existing Anki cards, unsuspending lecture-relevant cards, or making and improving flashcards from lectures, notes or diagrams with AnkiPlus MCP and a separate Anki MCP.
 ---
 
-AnkiPlus handles source material and working artifacts. The separate official
-Anki MCP reads and changes the Anki collection. Choose tools to fit the request;
-there is no required pipeline or review panel.
+# AnkiPlus companion
 
-Useful combinations:
+Cover the requested learning requirements with suitable existing cards, preferring
+AnkiHub-linked cards when available. Author only the remaining gaps. AnkiPlus
+handles sources, local drafts, checks and previews; the separate Anki MCP reads
+and changes the collection. The host chooses tools to fit the task.
 
-- Lecture cards: extract a source, inspect relevant slides/figures, draft cards,
-  check or preview them, then prepare payloads for Anki MCP.
-- Existing-card review: retrieve notes and note-type templates through Anki MCP,
-  save snapshots in a cards workspace, inspect previews, and consider changes.
-- Diagram cards: inspect the image, use OCR for suggested rectangles, adjust
-  labels/groups, and build an occlusion preview. OCR is assistance, not evidence
-  that every label was detected.
-- Targeted suspension/unsuspension: use the official Anki MCP directly; AnkiPlus
-  is useful only if source inspection, selection preparation or previews help.
+## Select before drafting
 
-Preserve source terminology, qualifications and citations when drafting. The
-optional get_guidance tool provides quality/reviewer rubrics when useful.
-Mechanical checks do not establish factual accuracy.
+Read [selection](references/existing-card-selection.md) when matching existing
+cards or choosing unsuspensions.
 
-Use explicit workspace IDs and current revisions for edits. Long operations
-return job IDs; get_job supplies results. get_image returns viewable images.
-Tool errors describe prerequisites and corrections without requiring a restart.
+- Search **all decks by default**; preserve a user-selected narrower scope.
+- Establish AnkiHub availability once. Prefer suitable linked cards, then search
+  non-AnkiHub cards for remaining gaps. With no linked cards, search existing
+  cards directly. If origin cannot be established, search all scoped cards and
+  record origin as unknown. AnkiHub is optional.
+- Judge the actual question and answer of each card/cloze. Keywords and facts
+  appearing only in Extra are not tested coverage. Count already-active cards
+  as covered; select only relevant suspended card IDs for unsuspension.
+- Partial coverage keeps the useful existing card and targets the extra lecture
+  detail separately. Check that gap against other existing cards before writing
+  it. Resolve source conflicts separately from missing detail.
 
-prepare_write generates files and arguments; it does not send them to Anki.
-Pass those payloads through the official Anki MCP and record actual responses
-if a report is useful. Note IDs identify notes; suspension uses card IDs.
+## Source and card quality
+
+Read [card quality](references/card-quality.md) before authoring or rewriting;
+read [diagrams](references/diagram-cards.md) only for visual identification tasks.
+
+Inspect the requested source scope, including diagrams needed to understand it.
+Keep a compact coverage record: **requirement | page/slide | selected card IDs |
+remaining gap or exclusion reason**. Use explicit objectives where available;
+otherwise identify testable requirements without inventing lecturer objectives.
+Preserve terminology, conditions, qualifications and units. Create clear,
+focused retrieval questions with useful explanatory backs.
+
+Review new/changed cards and uncertain matches for fidelity, ambiguity, leakage,
+duplication and interference. Check the resulting set against the coverage record.
+Cloze is a preference, not a quota. Additional reviewers are optional; choose them
+for a concrete uncertainty or a user request. There is no compulsory pipeline.
+
+## Keep work bounded
+
+Extract once per source version. Batch related searches, inspect plausible
+candidates and retain results. Read full fields/images only where needed to judge
+a match. Avoid dumping the collection or rendering unrelated cards. Broaden an
+unsuccessful search with relevant synonyms; if results remain unmanageably broad,
+report the uncertain gap rather than repeatedly expanding the search.
+
+Revisit settled decisions when evidence changes. Recheck revised cards and their
+affected group, rather than restarting the task. Stop when each requirement is
+covered, deliberately excluded or explicitly unresolved. Offer peripheral detail
+separately; a card count or tier percentage is never a target. Bundled optional
+rubrics may contain legacy house-style rules; apply the user's requested style
+and this companion's selection policy, without importing a mandatory review panel
+or fixed tier/cloze quotas.
+
+## Apply and report
+
+Follow the user's authorization and any requested preview-before-write boundary;
+local review findings and write plans are not user approval. Preserve existing
+decks, history and shared note types. Use current tool schemas for exact calls.
+
+Use explicit workspace IDs and current revisions. `save_cards` replaces the local
+set; preserve intended unchanged cards. Follow job IDs to completion.
+`prepare_write` prepares payloads, not Anki changes. Suspension uses Anki **card**
+IDs, not note IDs or workspace IDs. Inspect Anki before retrying an ambiguous write.
+
+Verify actual collection changes by readback. Report existing coverage, cards
+newly unsuspended, new notes and generated cards separately; distinguish proposed
+from executed actions and identify unresolved gaps. An unavailable Anki connection
+permits local drafting, not claims that existing coverage or writes were checked.
