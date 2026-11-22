@@ -58,3 +58,17 @@ See adjacent check-mcp.log, npm-test.log, container-build.log and discovery.json
 Discovery uses real stdio initialize and tools/list only, with disposable roots;
 requires version 0.3.0 and exactly 33 tools. No collection mutation was requested.
 No deployment, package publication or installed Anki add-on change was performed.
+
+Final observed results:
+- ./scripts/check-mcp.sh: exit 0; 250 passed, 1 skipped; frozen contract hashes
+  verified and ankiplusmcp-0.3.0-py3-none-any.whl built.
+- npm test: 28 passed, none skipped or failed.
+- Hook verification: 42/42 passed; version agreement and privacy checks exited 0.
+- Real stdio discovery: server ankiplusmcp, version 0.3.0, 33 tools; no tools called.
+- ANKIPLUS_REVISION=b0f4233 docker compose -p ankiplusmcp config --quiet: passed.
+- Same Compose build: failed in the unchanged release Dockerfile because Playwright's
+  bundled Node cannot load libatomic.so.1 before browser dependency installation.
+  No Dockerfile fix was applied: the owner's exact release source is authoritative.
+  No container was started or deployed. The successful wheel and stdio checks use
+  the available local dependencies. Original failed no-build-isolation editable
+  install was retried with build isolation successfully (setuptools was absent).
