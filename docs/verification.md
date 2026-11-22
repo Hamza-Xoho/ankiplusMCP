@@ -1,8 +1,53 @@
 # AnkiPlus MCP verification
 
-> Historical snapshot: the results below describe 2026-11-07, not the current
-> checkout or release. For current commands and verification scope, see the
-> [developer guide](developer-guide.md#checks-and-verification).
+## Documentation and repository polish: 2026-11-22
+
+Verified on Linux/Python 3.14 on `docs/student-guides`, starting from release
+commit `b0f4233`. The container tested below is labelled `dd66bf6-dirty`:
+verification included uncommitted documentation and the container bootstrap fix,
+so it is deliberately not presented as a clean-revision build.
+
+- `./scripts/check.sh`: 28 launcher tests passed; 250 Python tests passed, with
+  one explicit skip because system Google Chrome was not installed. The real
+  Chromium path was exercised. Privacy/version checks, all frozen contract
+  checksums and wheel build passed.
+- Catalogue validation: all 33 tool sections exactly match the public API and
+  README index. All 33 example argument sets validate against actual typed
+  inputs. Local documentation links and anchors resolve.
+- `npm pack --dry-run` passed. The wheel installed into a disposable target
+  outside the checkout; imports, packaged templates/assets and SPDX MIT metadata
+  were verified there.
+- SDK stdio smoke checks passed from the source checkout, the isolated wheel
+  install and the container: 33 tools, source extraction, saved cards, technical
+  checks, rendered MCP image content and payload preparation, with zero Anki
+  operations.
+- `docker compose -p ankiplusmcp config --quiet` and image build passed. The first
+  build exposed a pre-existing missing `libatomic.so.1` for Playwright's bundled
+  Node. Installing `libatomic1` before Playwright resolved it. The resulting image
+  ran as UID/GID 1000 with no network, a read-only filesystem, dropped capabilities,
+  no-new-privileges and bounded resources during the smoke check. Disposable
+  tmpfs workspaces avoided changing persistent user data.
+- A fresh reviewer checked standards, source accuracy, all tools, content
+  relocation, packaging and the Dockerfile fix; no material findings remained.
+  Two minor wording issues about administrative flags and PDF page limits were
+  corrected.
+- Runtime Python/JavaScript source, legacy CLI source, existing skills and frozen
+  tests were not changed. Repository maintenance changes are the combined check
+  entry point, Docker context exclusions, package licence metadata and the Docker
+  bootstrap dependency order.
+
+Limits: the default suite does not run all private-lecture contract tests. No
+live Anki collection, interactive host registration, Windows client or real
+student lecture was exercised. Typed example validation does not establish the
+factual accuracy of sample study material. Historical results below remain a
+separate record.
+
+Reproduce using the [developer check commands](developer-guide.md#checks-and-verification)
+and [container build instructions](developer-guide.md#optional-stdio-container).
+
+## Historical implementation snapshot: 2026-11-07
+
+> The following results describe 2026-11-07, not the current checkout or release.
 
 Verified locally on 2026-11-07, Python 3.14/Linux. Source branch:
 `feat/ankiplusmcp`, based on upstream `5bb2530`; implementation is uncommitted

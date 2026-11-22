@@ -1,6 +1,8 @@
 # Capability mapping
 
 AnkiPlus tools operate independently; these mappings do not prescribe a workflow.
+For current usage and implementation details, see the [complete tool reference](tools.md)
+and [developer guide](developer-guide.md).
 
 | Existing capability | MCP exposure |
 | --- | --- |
@@ -33,7 +35,7 @@ Install and host registration are handled by the npm launcher (`npx ankiplusmcp 
 `doctor`, `setup`, `uninstall`); see the README. `capabilities` also reports the active
 profile, where the source roots came from, and whether Tesseract and Chromium are present.
 
-Scope limits: local stdio only, at most 500 source pages and 500 cards per workspace,
+Scope limits: local stdio only, at most 500 PDF pages and 500 cards per workspace,
 64 MiB input files, 20 million decoded image pixels. Long native operations cancel
 at safe boundaries. Remote HTTP/authentication and legacy-build migration are
 not included. A failed/cancelled job may retain cache files, but is never reported

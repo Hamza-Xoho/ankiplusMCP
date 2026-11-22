@@ -24,28 +24,33 @@ The owner approved execution without further design questions; implement inline 
 
 ## Task 1: Repository polish
 
-Files: `pyproject.toml`, `.dockerignore`, `scripts/check.sh`,
+Files: `pyproject.toml`, `.dockerignore`, `Dockerfile`, `scripts/check.sh`,
 `docs/ARCHITECTURE.md`, `docs/verification.md`.
 
-- [ ] Modernise deprecated licence metadata and require its supporting setuptools floor.
-- [ ] Add one full-check entry point composing existing privacy/version, launcher and Python/build checks.
-- [ ] Exclude launcher outputs and worktrees from the Docker context.
-- [ ] Label legacy architecture and historical verification without removing their contents.
-- [ ] Verify metadata builds, shell syntax, full checks and unchanged frozen/runtime files; commit.
+- [x] Modernise deprecated licence metadata and require its supporting setuptools floor.
+- [x] Add one full-check entry point composing existing privacy/version, launcher and Python/build checks.
+- [x] Exclude launcher outputs and worktrees from the Docker context.
+- [x] Label legacy architecture and historical verification without removing their contents.
+- [x] Verify metadata builds, shell syntax, full checks and unchanged frozen/runtime files; commit.
+
+Ruling: container verification exposed a pre-existing Playwright bootstrap failure
+(`libatomic.so.1` missing before `install --with-deps` could run). Install
+`libatomic1` with Tesseract before invoking Playwright; retain runtime restrictions.
+The failing build and corrected build serve as the regression check.
 
 ## Task 2: Student README and guides
 
 Files: `README.md`, `docs/tools.md`, `docs/developer-guide.md`, `docs/setup.md`.
 
-- [ ] Rewrite the README with plain-language definitions, setup and concrete study requests.
-- [ ] Preserve detailed installation/configuration instructions in the setup guide.
-- [ ] Document every tool with inputs/defaults, output shape, prerequisites, example and implementation path.
-- [ ] Explain architecture, reuse of legacy internals, persistence, jobs, revisions, limits and extension points.
-- [ ] Check catalogue completeness and local links; exercise documented examples and packaging.
+- [x] Rewrite the README with plain-language definitions, setup and concrete study requests.
+- [x] Preserve detailed installation/configuration instructions in the setup guide.
+- [x] Document every tool with inputs/defaults, output shape, prerequisites, example and implementation path.
+- [x] Explain architecture, reuse of legacy internals, persistence, jobs, revisions, limits and extension points.
+- [x] Check catalogue completeness and local links; exercise documented examples and packaging.
 
 ## Task 3: Verification and review
 
-- [ ] Run `./scripts/check.sh`, wheel/npm packaging and stdio smoke checks.
-- [ ] Validate Compose and build a correctly labelled dirty container; do not deploy.
-- [ ] Obtain one fresh review of the full diff for standards and approved scope; fix material findings.
-- [ ] Record measured results/limitations, mark plan steps complete, and commit documentation.
+- [x] Run `./scripts/check.sh`, wheel/npm packaging and stdio smoke checks.
+- [x] Validate Compose and build a correctly labelled dirty container; do not deploy.
+- [x] Obtain one fresh review of the full diff for standards and approved scope; fix material findings.
+- [x] Record measured results/limitations, mark plan steps complete, and commit documentation.
