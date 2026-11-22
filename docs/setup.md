@@ -162,9 +162,17 @@ If you ship software that includes it, read its terms.
 | No tools after registration | Restart/reconnect your AI host, check its MCP logs, and run `doctor`. The server uses stdio; there is no URL or port to open. |
 | `DEPENDENCY` error | Follow the remedy returned by the tool. OCR needs system Tesseract; rendering needs an available browser. |
 | Preview browser is missing | Run `setup`, or choose an installed Chrome using `--browser chrome` or `browser = "chrome"` in the config file. |
-| `STALE` revision | Ask the host to read the workspace again and reconcile the edit with its current cards. Do not blindly repeat the old save. |
+| `STALE` revision | If a job is running, wait for it with `get_job`, then read the workspace again and reconcile the edit with its current cards. Page/image generation and rendering can advance revisions too. Do not blindly repeat the old save. |
 | `LABELS_PENDING` | Text is available but figure OCR is still running. Wait for `get_job` to complete before checking coverage. |
 | Anki collection operations are unavailable | Configure a separate Anki MCP in your host. AnkiPlus itself cannot connect to Anki. |
+| PDF text is garbled although slides look normal | After extraction provides slide data, use `get_page_image` and `get_image` to inspect the slide. A non-empty broken text layer may not trigger OCR replacement. Page viewing does not repair extracted text. |
+| House-style checks report a foreign tag tree | Compare draft tags with the active profile/tag root from `capabilities`. Correct the mismatch if that style is intended. Technical-only checks do not establish that disabled style rules passed. |
+| `read_source` or `read_artifact` rejects the requested limit | Use at most 24,000 characters and follow `next_offset`; do not increase the limit to force the whole lecture into one response. |
+| Companion Anki tool rejects a deck path | Inspect that tool's schema/remedy and current decks. Deck creation limits belong to the installed companion, not AnkiPlus; choose a supported creation/move method before writing. |
+| A connection drops during an Anki write | Inspect actual notes/card IDs in Anki before retrying. Resume the saved workspace and retain any previously requested approval-before-write requirement. |
+
+For a full example combining existing-card matching, gap drafts, explanatory
+backs and manual review, see the [worked study workflow](study-workflow.md).
 
 Keep your host's logs separate from MCP stdout. For source-only work you do not
 need Anki running; Anki connection requirements belong to the separately installed

@@ -54,3 +54,21 @@ Files: `README.md`, `docs/tools.md`, `docs/developer-guide.md`, `docs/setup.md`.
 - [x] Validate Compose and build a correctly labelled dirty container; do not deploy.
 - [x] Obtain one fresh review of the full diff for standards and approved scope; fix material findings.
 - [x] Record measured results/limitations, mark plan steps complete, and commit documentation.
+
+## Follow-up: apply lessons from an example conversation
+
+The owner supplied a private flowchart/export bundle and explicitly chose
+README/guides improvements only. Analyse it before implementing. Keep raw chat,
+lecture content, source paths and collection identifiers out of public files.
+Prior authorisation to push this documentation branch remains in effect.
+
+Files: `README.md`, new `docs/study-workflow.md`, `docs/tools.md`,
+`docs/setup.md`, `docs/developer-guide.md` and `docs/verification.md`.
+
+- [x] Compare the example's two runs, revisions and recoveries with current source.
+- [x] Generalise the reuse-first workflow, explanatory backs, diagram selection,
+  complete manual review, external Anki handoff, readbacks and count distinctions.
+- [x] Explain source fallback, profile/style mismatch, bounded reads and job/revision
+  sequencing without converting the observed flow into a mandatory pipeline.
+- [x] Verify source accuracy, all documentation links and the unchanged tool catalogue.
+- [x] Run relevant repository checks, review the documentation diff, commit and push.

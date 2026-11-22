@@ -35,6 +35,27 @@ Four tools return **jobs**: `extract_source`, `export_figures`, `ocr_image` and
 `render_cards`. Use `get_job` until a terminal state, then follow its `result`.
 A queued/running response is not the finished output. See [jobs](#get_job).
 
+## Combining the tools for a lecture task
+
+The [worked study workflow](study-workflow.md) shows reuse-first matching,
+explanatory backs, diagram choices, manual review and the separate Anki handoff.
+The important contracts when combining calls are:
+
+- Collection matching is performed by the host through its Anki MCP, not by
+  `resolve_target` or `check_cards`. Source objectives help the assistant decide
+  what existing cards cover and where new drafts are needed.
+- Keep existing-card preview snapshots separate from new-note drafts. The
+  default `action="create"` on a snapshot does not mean it should be imported
+  again. Unsuspension uses actual Anki card IDs through the companion.
+- Rich backs use the saved note's existing fields, media and supplied templates;
+  there is no automatic explanation/image selection tool. Inspect both sides.
+- Wait for rendering or other artifact-producing jobs, then refresh the workspace
+  before saving/reviewing against its revision. Do not remove the revision guard
+  to work around a `STALE` response.
+- Preparing a plan and submitting a review do not authorise a collection write.
+  If the user requests approval first, the host must preserve that requirement
+  through revisions and interruptions; AnkiPlus does not enforce it remotely.
+
 ## Setup and workspaces
 
 ### capabilities
@@ -357,7 +378,9 @@ card validation, [cloze/occlusion checks](../src/ankiplusmcp/validation.py), opt
 [cards.check.lint](../src/cards/check/lint.py) house rules and
 [coverage](../src/cards/check/coverage.py) summaries. It returns findings without
 rewriting cards. Coverage on `ids` evaluates that selection, not omitted cards.
-It does not verify factual truth.
+It does not verify factual truth or fetch existing Anki cards. Coverage also does
+not combine a separate existing-card preview workspace with the draft workspace;
+keep an explicit learning-objective map when counting reused cards toward coverage.
 
 ### render_cards
 
@@ -452,7 +475,9 @@ conflicts, emits text imports via [cards.write.importfile](../src/cards/write/im
 and records tier-3 suspension intentions. Artifacts live in `write/<plan>/`.
 The host imports media, executes writes via Anki MCP and resolves actual Anki
 card IDs before suspension. Counts named `created`/`updated` here describe the
-plan, not successful writes. Inspect the desired actions before executing them.
+plan, not successful writes. They count note records, not all generated study
+cards; one cloze or image-occlusion note may produce several cards. Inspect the
+desired actions before executing them.
 
 ### record_external_results
 

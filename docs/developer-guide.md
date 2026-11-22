@@ -222,6 +222,25 @@ Tier-3 suspension entries are intentions until the host acts on real card IDs.
 planned create/update numbers are not successful-write counts. Ambiguous writes
 must be reconciled against Anki before retrying to avoid duplicates.
 
+### Sequencing a study request across servers
+
+The [worked study workflow](study-workflow.md) illustrates the host's orchestration
+responsibilities. The server has no collection-search, automatic gap-detection,
+human-approval or write-execution tool. Reuse selection and explanatory card
+content are model decisions based on source material and external snapshots.
+
+Keep preview-only existing-note snapshots out of new-note write plans; the input
+model defaults `action` to `create`. Coverage examines one workspace's selected
+local cards and omissions, not the host's external reuse list or another
+workspace. `submit_review` is evidence storage, not a human approval receipt.
+
+Wait for jobs to finish before reading the revision used for a following edit.
+For example, `render_cards` can increment the workspace revision without changing
+card fields, so a review submitted with a pre-render revision can be refused.
+Refreshing and reconciling is the supported recovery. Anki deck creation limits
+and network-stream failures belong to the companion/host; they are not reasons
+to add collection proxy code or bypass revision checks in AnkiPlus.
+
 ## Development setup
 
 Use Python 3.12+ and Node 18+. Tests here have been exercised on Python 3.14/Linux;

@@ -12,13 +12,14 @@ MCP (Model Context Protocol) is how an AI app connects to tools. AnkiPlus is an
 MCP server running locally on your computer. It has no chat interface of its own.
 Use it through a compatible host such as Claude Code, Claude Desktop or Codex.
 
-[Quick start](#quick-start) · [Study examples](#study-with-it) · [All 33 tools](docs/tools.md) · [Setup guide](docs/setup.md) · [Developer guide](docs/developer-guide.md)
+[Quick start](#quick-start) · [Worked lecture workflow](docs/study-workflow.md) · [All 33 tools](docs/tools.md) · [Setup guide](docs/setup.md) · [Developer guide](docs/developer-guide.md)
 
 ## What can it help you do?
 
 | Your study task | What AnkiPlus provides |
 | --- | --- |
 | Make cards from a lecture | Extracted text, slide references, figures and learning objectives for your assistant to draft from. |
+| Reuse cards you already own | Source material and local previews to help your assistant compare existing Anki cards with the lecture, then draft only the gaps. Collection search and unsuspension use the separate Anki MCP. |
 | Learn a labelled diagram | OCR label regions and image-occlusion masks that hide labels for recall practice. |
 | Check how cards will look | Front/back images and contact sheets: several card previews on one image. |
 | Improve an existing deck | Local snapshots, formatting checks, optional review proposals and a preview of suggested field changes. |
@@ -106,6 +107,41 @@ you share with it.
 
 ## Study with it
 
+### Reuse existing cards and fill the gaps
+
+> Read the learning objectives in this lecture. Search my existing deck through
+> Anki MCP and suggest cards that already cover them. Draft new cards only for
+> the gaps. Give new cards useful explanations and relevant lecture images on
+> their backs. Use image occlusion where identifying labels is a learning goal.
+> Show every proposed existing and new card, including both sides, and wait for
+> my approval before changing Anki.
+
+Matching is a judgement your assistant makes, not an automatic deduplication
+feature of AnkiPlus. Ask it to show which objective each proposed card covers,
+identify conflicts with your lecture, and explain any omissions.
+
+A typical task looks like this; it is an example, not a required pipeline:
+
+```mermaid
+flowchart TD
+    A[Read lecture objectives and inspect source] --> B[Compare with existing Anki cards]
+    B --> C[Select existing cards for reuse]
+    B --> D[Draft gap cards and useful diagram masks]
+    C --> E[Preview both sets and inspect explanations]
+    D --> E
+    E --> F{Approve the proposed Anki changes?}
+    F -->|Revise| R[Revise drafts and regenerate previews]
+    R --> E
+    F -->|Yes| G[Host uses separate Anki MCP to add or unsuspend]
+    G --> H["Host verifies and reports; you sync Anki"]
+```
+
+Existing cards can stay in their original decks. New notes can generate several
+study cards, especially with multiple cloze deletions or diagram masks, so ask
+for separate counts of new notes, new cards and existing cards to unsuspend.
+The [worked study guide](docs/study-workflow.md) explains the steps, review
+choices and recovery from problems seen in an example run.
+
 ### Learn a diagram
 
 > Find the labelled diagram on slide 12. Show me the figure, recognise its labels,
@@ -164,6 +200,7 @@ and rendering operations return jobs; the assistant checks `get_job` for results
 
 ## Configuration and help
 
+- [Worked study workflow](docs/study-workflow.md): reuse existing cards, draft gaps, improve backs, review and approve the handoff to Anki.
 - [Setup and troubleshooting](docs/setup.md): host registration, browser choice, source folders, workspace location and unattended commands.
 - [Profiles](docs/setup.md#profiles): standard Anki `Cloze` defaults or the optional `ColdRecall Cloze` conventions.
 - [Developer guide](docs/developer-guide.md): architecture, tool internals, development, testing and the optional stdio container.

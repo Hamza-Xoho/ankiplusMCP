@@ -1,5 +1,33 @@
 # AnkiPlus MCP verification
 
+## Example-run documentation follow-up: 2026-11-22
+
+Starting from `8a0035f`, analysed a user-supplied private flowchart/export bundle,
+then updated only the README and guides as requested. Public examples generalise
+study content and identifiers; the source bundle and private evidence notes are
+not included in Git. No source scripts from the bundle were executed.
+
+- Added a worked reuse-first study workflow and README flowchart, plus recovery
+  guidance for unreadable PDF text, bounded reads, style/profile mismatches,
+  revision changes, connection interruptions and companion deck constraints.
+- Checked the guidance against current source, including the default create
+  action on preview snapshots, workspace-local coverage, optional checks, caller
+  evidence and distinct note/card counts.
+- `./scripts/check.sh` passed: 28 launcher tests, 250 Python tests, one skipped
+  system-Chrome test, frozen contract checksums, privacy/version checks and wheel
+  build. `npm pack --dry-run --json` also passed.
+- All 33 tool sections still match the API/README; all 33 existing example input
+  sets validate against actual annotations. Local Markdown links/anchors resolve.
+- A fresh documentation review found no material issues. Clarified that existing
+  card IDs are available before a write, while new-card IDs require creation and
+  readback.
+
+This follow-up changes no runtime code and makes no live Anki calls. It does not
+re-run the private conversation, establish medical accuracy or prove a user sync.
+The container results below belong to the earlier repository-polish verification;
+a new container build was not needed for these guide-only changes.
+
+
 ## Documentation and repository polish: 2026-11-22
 
 Verified on Linux/Python 3.14 on `docs/student-guides`, starting from release
