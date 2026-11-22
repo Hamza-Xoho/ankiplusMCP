@@ -5,7 +5,7 @@
 **Goal:** Polish the repository and explain AnkiPlus MCP clearly for students and developers.
 **Architecture:** Preserve runtime code and contracts. Separate student onboarding, complete tool reference, and developer internals; retain historical documents with explicit navigation.
 **Tech Stack:** Markdown, Python packaging, POSIX shell, Node launcher, Docker Compose.
-**Spec:** `docs/superpowers/specs/2026-11-22-student-documentation-design.md`.
+**Spec:** `docs/development/specs/2026-11-22-student-documentation-design.md`.
 
 ## Global Constraints
 
@@ -25,7 +25,7 @@ The owner approved execution without further design questions; implement inline 
 ## Task 1: Repository polish
 
 Files: `pyproject.toml`, `.dockerignore`, `Dockerfile`, `scripts/check.sh`,
-`docs/ARCHITECTURE.md`, `docs/verification.md`.
+`docs/legacy/architecture.md`, `docs/development/verification.md`.
 
 - [x] Modernise deprecated licence metadata and require its supporting setuptools floor.
 - [x] Add one full-check entry point composing existing privacy/version, launcher and Python/build checks.
@@ -63,7 +63,7 @@ lecture content, source paths and collection identifiers out of public files.
 Prior authorisation to push this documentation branch remains in effect.
 
 Files: `README.md`, new `docs/study-workflow.md`, `docs/tools.md`,
-`docs/setup.md`, `docs/developer-guide.md` and `docs/verification.md`.
+`docs/setup.md`, `docs/developer-guide.md` and `docs/development/verification.md`.
 
 - [x] Compare the example's two runs, revisions and recoveries with current source.
 - [x] Generalise the reuse-first workflow, explanatory backs, diagram selection,
@@ -72,3 +72,18 @@ Files: `README.md`, new `docs/study-workflow.md`, `docs/tools.md`,
   sequencing without converting the observed flow into a mandatory pipeline.
 - [x] Verify source accuracy, all documentation links and the unchanged tool catalogue.
 - [x] Run relevant repository checks, review the documentation diff, commit and push.
+
+## Follow-up: separate guides from development records
+
+The owner requested organisation by audience. Keep maintained current-product
+guides at `docs/`, legacy usage/architecture under `docs/legacy/`, and plans,
+specifications, handoffs and verification under `docs/development/`.
+
+- [x] Inventory document roles and references from frozen tooling.
+- [x] Move all development/legacy documents without discarding content; retain
+  four byte-identical legacy specification targets with compatibility symlinks.
+- [x] Add public/development indexes and update links, contributor pointers and
+  phase prompts. Relocate the privacy checker's existing plan exemption to its
+  new path without adding exemptions.
+- [x] Validate links, document preservation, compatibility paths and repository checks.
+- [x] Review, commit, merge and push the organisation update to main.

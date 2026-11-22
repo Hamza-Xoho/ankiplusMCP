@@ -1,5 +1,21 @@
 # AnkiPlus MCP verification
 
+## Documentation organisation: 2026-11-22
+
+Moved 24 documents into legacy usage and development-record directories while
+keeping maintained public guides at `docs/`. Added audience indexes and updated
+active links, contributor pointers and phase prompts. Four original specification
+paths remain compatibility symlinks to byte-identical targets for frozen tooling.
+The privacy checker's existing plan exemption follows that plan's new path.
+
+`./scripts/check.sh` passed: 28 launcher tests, 250 Python tests, one system-Chrome
+skip, frozen checksums, privacy/version checks and wheel build. Documentation
+link/anchor checks, all 33 tool entries/examples, retained-document checks and
+frozen-tool documentation pointers passed. Independent review found one legacy
+navigation mismatch, corrected before committing. Runtime source, existing
+skills, frozen hooks and test files were unchanged.
+
+
 ## Example-run documentation follow-up: 2026-11-22
 
 Starting from `8a0035f`, analysed a user-supplied private flowchart/export bundle,
@@ -70,8 +86,8 @@ student lecture was exercised. Typed example validation does not establish the
 factual accuracy of sample study material. Historical results below remain a
 separate record.
 
-Reproduce using the [developer check commands](developer-guide.md#checks-and-verification)
-and [container build instructions](developer-guide.md#optional-stdio-container).
+Reproduce using the [developer check commands](../developer-guide.md#checks-and-verification)
+and [container build instructions](../developer-guide.md#optional-stdio-container).
 
 ## Historical implementation snapshot: 2026-11-07
 

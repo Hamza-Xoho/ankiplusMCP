@@ -23,11 +23,11 @@ Claude Code in `this repository` runs `/anki2` + a PDF end to end. It is driven 
 
 ## Read first
 
-- `docs/anki-v2-brief.md` §4b in full, plus §4 (the phase list)
-- `docs/design-spec.md` §4.2, §5, §6
-- `docs/anki-v2-trd.md`: the orchestration table, C-6, C-7
+- `docs/development/specs/legacy/anki-v2-brief.md` §4b in full, plus §4 (the phase list)
+- `docs/development/specs/legacy/design-spec.md` §4.2, §5, §6
+- `docs/development/specs/legacy/anki-v2-trd.md`: the orchestration table, C-6, C-7
 - `$claude-code-runtime`: Skills, Subagents, Hooks
-- `docs/test-contract.md`: the Phase 6 table
+- `docs/development/specs/legacy/test-contract.md`: the Phase 6 table
 - **Source material for the rules worth keeping:** the v1 `.claude/skills/anki/SKILL.md`. Port invariants and house style; drop anecdotes and token-budget prose (the code enforces those now).
 
 ## Build

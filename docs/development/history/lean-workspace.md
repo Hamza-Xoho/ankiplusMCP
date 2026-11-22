@@ -310,7 +310,7 @@ No `~/.claude/` directory from the owner’s Mac was supplied. The transcript pr
 5. `~/.claude/CLAUDE.md`: excluded by project settings; no user-level edit needed. The application-managed `ccd_*` tools may be SDK servers, which the documented denylist exempts. Desktop tools may therefore require disabling them in the client; confirm by a fresh transcript.
 
 ## Manual measurement
-Fill Sonnet 5.5 prices only at the owner’s gate. Start a fresh Cards session, say hi, close it, then meter --latest. Record `char_fr25_first_call_drop` in docs/decisions.md only after measuring ≥10k below 79k. No reduction is claimed yet.
+Fill Sonnet 5.5 prices only at the owner’s gate. Start a fresh Cards session, say hi, close it, then meter --latest. Record `char_fr25_first_call_drop` in docs/development/history/decisions.md only after measuring ≥10k below 79k. No reduction is claimed yet.
 
 ## Baseline discrepancy
 The runtime skill lists 10 main contact-sheet Read calls. The original fixture contains 8 Read tool uses under renders/sheets (2 PDF reads and 3 draft reads make 13 Read calls total). The meter reports the observed 8 rather than manufacturing 10. Both PDF reads returned images, so W-2 and W-7 still fail.

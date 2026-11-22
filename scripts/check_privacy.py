@@ -15,7 +15,7 @@ EMAIL = re.compile(r'(?<![A-Za-z0-9._%+-])[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-
 ALLOWED_EMAILS = {'noreply@anthropic.com'}
 # Decorators and scoped package names look like addresses; these are not mail domains.
 # Files that hold this checker's own made-up examples.
-EXEMPT = {'tests/unit/test_privacy_check.py', 'docs/superpowers/plans/2026-11-10-npx-launcher.md'}
+EXEMPT = {'tests/unit/test_privacy_check.py', 'docs/development/plans/2026-11-10-npx-launcher.md'}
 NOT_MAIL_SUFFIXES = ('.mark.skip', '.mark.skipif', '.mark.xfail', '.mark.parametrize', '.fixture')
 
 

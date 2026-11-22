@@ -1,5 +1,10 @@
 # Lecture2Cards
 
+> Legacy usage guide for the original `cards` CLI and `/ankiv2` skill.
+> For the current AnkiPlus MCP toolkit, start with the
+> [documentation index](../README.md). Development history is kept in the
+> [development records](../development/README.md).
+
 Turn one lecture PDF into reviewed Anki flashcards.
 
 Lecture2Cards reads a lecture, drafts cloze and image-occlusion cards that use
@@ -22,7 +27,7 @@ It ships two things:
 > check of the material.
 
 Want to know how it works or why it is built this way? See
-[`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md).
+[`docs/legacy/architecture.md`](architecture.md).
 
 ---
 
@@ -52,7 +57,7 @@ Nothing is deleted. Existing notes are never removed or rewritten by the tool.
 | Chromium for Playwright | Used to render the card previews. See install step 1. |
 | Anki desktop | Must be open while the tool writes cards. |
 | A local Anki MCP server | The skill talks to Anki through MCP tools, at `http://127.0.0.1:3141/`. This project was built and tested against the AnkiMCP add-on. |
-| The ColdRecall Cloze note type | Shipped in [`src/cards/assets/coldrecall-cloze/`](../src/cards/assets/coldrecall-cloze/). Create it in Anki once (see below). |
+| The ColdRecall Cloze note type | Shipped in [`src/cards/assets/coldrecall-cloze/`](../../src/cards/assets/coldrecall-cloze). Create it in Anki once (see below). |
 | Claude Code or OpenCode | With an account that can run a long agent session. A build reads the lecture, drafts, and runs two review rounds, so it uses a lot of model usage. |
 
 ## Install
@@ -201,12 +206,12 @@ keep it the same when you resume.
 
 ## For developers
 
-- [`docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md): how the pipeline works, the
+- [`docs/legacy/architecture.md`](architecture.md): how the pipeline works, the
   build state machine, the CLI contract, and the reasons behind the design.
-- [`docs/anki-v2-brief.md`](../docs/anki-v2-brief.md): why and what.
-- [`docs/anki-v2-trd.md`](../docs/anki-v2-trd.md) and
-  [`docs/design-spec.md`](../docs/design-spec.md): requirements and the how.
-- [`docs/test-contract.md`](../docs/test-contract.md): the named contract tests.
+- [`docs/development/specs/legacy/anki-v2-brief.md`](../development/specs/legacy/anki-v2-brief.md): why and what.
+- [`docs/development/specs/legacy/anki-v2-trd.md`](../development/specs/legacy/anki-v2-trd.md) and
+  [`docs/development/specs/legacy/design-spec.md`](../development/specs/legacy/design-spec.md): requirements and the how.
+- [`docs/development/specs/legacy/test-contract.md`](../development/specs/legacy/test-contract.md): the named contract tests.
 
 Development setup:
 
@@ -222,8 +227,8 @@ make a change pass. Tests that need private lecture PDFs are skipped in public C
 through `CARDS_PUBLIC_CI=1`. Locally, a missing private fixture fails the test.
 
 The build history (phase logs and run results) is in
-[`docs/development-history.md`](../docs/development-history.md) and
-[`docs/decisions.md`](../docs/decisions.md).
+[`docs/development/history/development-history.md`](../development/history/development-history.md) and
+[`docs/development/history/decisions.md`](../development/history/decisions.md).
 
 ## Limitations
 
@@ -238,4 +243,4 @@ The build history (phase logs and run results) is in
 
 ## Licence
 
-MIT. See [`LICENSE`](../LICENSE).
+MIT. See [`LICENSE`](../../LICENSE).

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12+, PyMuPDF, Pillow, Tesseract (subprocess), Playwright, `mcp` 1.30, pytest.
 
-**Spec:** `docs/superpowers/specs/2026-11-10-efficacy-design.md`, section "3a. Core and speed". Read "What was measured", "Constraints" and "3a" before starting.
+**Spec:** `docs/development/specs/2026-11-10-efficacy-design.md`, section "3a. Core and speed". Read "What was measured", "Constraints" and "3a" before starting.
 
 ## Global Constraints
 
@@ -781,7 +781,7 @@ git commit -m "feat: previews can use the system's Chrome; no download needed wh
 **Files:**
 - Modify: `src/ankiplusmcp/server.py`
 - Create: `tests/mcp/test_adapters.py`, `tests/tools/time_extract.py`
-- Modify: `tests/mcp/test_protocol.py`, `docs/ARCHITECTURE.md`, `README.md`
+- Modify: `tests/mcp/test_protocol.py`, `docs/legacy/architecture.md`, `README.md`
 
 **Interfaces:**
 - Consumes: everything above.
@@ -830,7 +830,7 @@ Record the four numbers, the machine's core count and the Tesseract version.
 
 - [ ] **Step 5: Update the documents**
 
-`docs/ARCHITECTURE.md`: in section 6 and the "Performance" entry of section 13, replace the 220 s statement with the numbers from Step 4, labelled as synthetic, and say what is still unmeasured (real lectures; label recall is unchanged by construction because OCR settings did not change). Add one paragraph naming the typed functions as the interface the MCP uses. `README.md`: document `--browser` and the `browser` config key, and that `setup` is not needed when Google Chrome is installed.
+`docs/legacy/architecture.md`: in section 6 and the "Performance" entry of section 13, replace the 220 s statement with the numbers from Step 4, labelled as synthetic, and say what is still unmeasured (real lectures; label recall is unchanged by construction because OCR settings did not change). Add one paragraph naming the typed functions as the interface the MCP uses. `README.md`: document `--browser` and the `browser` config key, and that `setup` is not needed when Google Chrome is installed.
 
 - [ ] **Step 6: Full verification**
 
@@ -848,7 +848,7 @@ Expected: all suites pass; the contract run shows `261 passed, 24 skipped`; `IDE
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/ankiplusmcp/server.py tests docs/ARCHITECTURE.md README.md
+git add src/ankiplusmcp/server.py tests docs/legacy/architecture.md README.md
 git commit -m "fix: handshake reports the package version; guard the adapters; record timings"
 ```
 

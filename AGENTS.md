@@ -1,10 +1,15 @@
 # AnkiPlus MCP development
 
+Documentation: `docs/README.md` indexes current public guides. Development-only
+designs, plans and handoffs belong under `docs/development/`; legacy usage guides
+live in `docs/legacy/`. Four original spec paths at `docs/` are compatibility
+symlinks for frozen tooling; preserve them and their target contents.
+
 The new product is `ankiplusmcp`, implemented in `src/ankiplusmcp/`.
 Run `./scripts/check-mcp.sh`; use `python -m ankiplusmcp` for stdio.
 The npm launcher (`npx ankiplusmcp`: serve, init, doctor, setup, uninstall) is in
 `launcher/`, dependency-free; run `npm test`. Keep `package.json` and
-`pyproject.toml` on the same version. Design: `docs/superpowers/specs/2026-11-10-npx-launcher-design.md`.
+`pyproject.toml` on the same version. Design: `docs/development/specs/2026-11-10-npx-launcher-design.md`.
 The official Anki MCP is a separate host dependency. Do not add Anki connection,
 proxy or collection mutation code. Keep the host model in control of workflows.
 Use `tests/mcp/` for new MCP tests. Frozen: the contract tests in `.codex/contract.sha256`, `.codex/`, `.agents/`
@@ -13,7 +18,7 @@ approved plan lists (owner's decision, 2026-11-10); the `cards` CLI's output
 must stay byte-identical, checked with `tests/tools/cli_baseline.py compare`.
 The historical phase-building instructions below apply to the legacy CLI,
 not the new independent MCP workspace/API. Approved migration design:
-`docs/superpowers/specs/2026-11-07-ankiplusmcp-design.md`.
+`docs/development/specs/2026-11-07-ankiplusmcp-design.md`.
 
 ---
 
@@ -39,21 +44,21 @@ You are building tools that a *different* agent (Claude Code) runs to make Anki 
 
 ## Boundaries
 
-- `common` imports nothing from `cards`. `cli` holds no logic. Dependency directions: `docs/design-spec.md` §2.
+- `common` imports nothing from `cards`. `cli` holds no logic. Dependency directions: `docs/development/specs/legacy/design-spec.md` §2.
 - `.claude/` is the runtime (Claude Code). Edit it only in the phases that say so (1 settings, 4–7). Never touch `.claude/skills/anki/` (v1, still in use).
 - Lecture PDFs, `<your notes vault>` and the lecture folder are read-only.
 
 ## How to work
 
 - **One phase per thread.** Read the phase prompt you were given, then only the spec sections it names.
-- Write that phase's contract tests first, with the exact names from `docs/test-contract.md`. Run them and show they fail. Then implement.
+- Write that phase's contract tests first, with the exact names from `docs/development/specs/legacy/test-contract.md`. Run them and show they fail. Then implement.
 - Before reporting, run the auditors the phase prompt names (`contract_auditor`, `boundary_auditor`, `token_auditor`) as subagents, and fix what they find.
 - Stop at the phase's definition of done. Report: what you built, test results, auditor verdicts, anything you couldn't do. **Do not start the next phase.** the owner runs the gate.
 - A private fixture missing (`tests/fixtures/private/…`) is a stop-and-ask, not a reason to skip a test.
 
 ## Where things are
 
-- Why/what: `docs/anki-v2-brief.md` · Tool requirements: `docs/anki-v2-trd.md`
-- How (names, schemas, errors): `docs/design-spec.md` · Named tests: `docs/test-contract.md`
+- Why/what: `docs/development/specs/legacy/anki-v2-brief.md` · Tool requirements: `docs/development/specs/legacy/anki-v2-trd.md`
+- How (names, schemas, errors): `docs/development/specs/legacy/design-spec.md` · Named tests: `docs/development/specs/legacy/test-contract.md`
 - Repo conventions, on demand: `$cards-cli-conventions`, `$claude-code-runtime`
 - Code to port: `.claude/skills/anki/scripts/` (v1: deck_name, extract_figures, ocr_regions, build_occlusion, render_cards)

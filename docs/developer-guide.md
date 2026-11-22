@@ -4,7 +4,7 @@
 
 This guide describes the current `ankiplusmcp` server and launcher. The original
 `cards` CLI still ships in the same Python package; its mandatory phase/gate
-workflow is documented separately in [legacy architecture](ARCHITECTURE.md).
+workflow is documented separately in [legacy architecture](legacy/architecture.md).
 
 ## Architecture
 
@@ -320,7 +320,7 @@ additional wheel-install and npx/uv integration jobs in
 | [launcher/test](../launcher/test) | Host edits/backups/ownership, launcher arguments, stdio, uv and command exits. |
 | [tests/unit](../tests/unit), [tests/contract](../tests/contract) | Legacy compatibility; frozen contracts are not editable. |
 
-See the [verification record](verification.md) for dated results and limitations.
+See the [verification record](development/verification.md) for dated results and limitations.
 Do not interpret historical evidence as a claim that live Anki, every host UI,
 Windows or all private-fixture cases have been tested.
 

@@ -5,7 +5,7 @@
 **Goal:** Deliver the approved independent mechanical MCP toolkit and companion skill.
 **Architecture:** A new ankiplusmcp package adapts existing cards operations. Explicit isolated workspaces, typed tools, durable jobs and bounded artifact results replace phase orchestration.
 **Tech Stack:** Python 3.12+, official MCP Python SDK, Pydantic, existing OCR/renderer modules.
-**Spec:** docs/superpowers/specs/2026-11-07-ankiplusmcp-design.md (approved in conversation).
+**Spec:** docs/development/specs/2026-11-07-ankiplusmcp-design.md (approved in conversation).
 
 ## Global Constraints
 - Official Anki MCP is a separate host dependency; no Anki connection/proxy/writes.

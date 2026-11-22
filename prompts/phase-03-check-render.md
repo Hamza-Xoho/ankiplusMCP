@@ -25,9 +25,9 @@ Given `drafts.jsonl`:
 
 ## Read first
 
-- `docs/anki-v2-trd.md` T-5, T-6, T-11
-- `docs/design-spec.md` §3.4, §3.5 (lint table), §4.1 (`check`, `render`, `figures` rows)
-- `docs/test-contract.md`: the Phase 3 table
+- `docs/development/specs/legacy/anki-v2-trd.md` T-5, T-6, T-11
+- `docs/development/specs/legacy/design-spec.md` §3.4, §3.5 (lint table), §4.1 (`check`, `render`, `figures` rows)
+- `docs/development/specs/legacy/test-contract.md`: the Phase 3 table
 - v1 code to port: `.claude/skills/anki/scripts/render_cards.py` (renderer + its lint), `build_occlusion.py`
 - Note-type assets: `.claude/skills/anki/assets/coldrecall-cloze/`. Copy them to `.claude/skills/anki2/assets/coldrecall-cloze/` (this is the one `.claude/` write allowed here).
 

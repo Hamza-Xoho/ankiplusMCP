@@ -22,15 +22,15 @@ A working `cards` package with the shared CLI contract and `cards state`, plus a
 
 ## Read first
 
-- `docs/design-spec.md`:
+- `docs/development/specs/legacy/design-spec.md`:
   - §1 (D-3, D-4, D-16, D-17, D-18)
   - §2
   - §3.1 and §3.10
   - §5 (the build-phase part)
   - §6
   - §7 (`cards.toml` only)
-- `docs/anki-v2-trd.md` §G, D-1, T-1
-- `docs/test-contract.md`: the Phase 0 table
+- `docs/development/specs/legacy/anki-v2-trd.md` §G, D-1, T-1
+- `docs/development/specs/legacy/test-contract.md`: the Phase 0 table
 - `$cards-cli-conventions`
 
 ## Build
@@ -53,7 +53,7 @@ A working `cards` package with the shared CLI contract and `cards state`, plus a
 6. **Q-1 probe:** `tools/q1_probe.py`, standalone and outside the package.
    - It posts an MCP `initialize` then `tools/list` JSON-RPC request to `http://127.0.0.1:3141/`, with headers `Content-Type: application/json` and `Accept: application/json, text/event-stream`, and handles an SSE reply.
    - It prints `Q1 OK: <n> tools` or `Q1 FAIL: <reason>`.
-   - Also write `docs/decisions.md` with an empty `## Q-1 result` section.
+   - Also write `docs/development/history/decisions.md` with an empty `## Q-1 result` section.
 
 Write the Phase 0 contract tests first (`tests/contract/test_p0_foundations.py`), run them, and show they fail. Then implement.
 
@@ -83,7 +83,7 @@ Then, by hand:
 1. `.venv/bin/cards state init "<path to the L006 PDF>"`. Check the stdout shape, that `builds/<date>_MED241-L006/build.json` exists, and that `cards state next --build builds/<that>` names P0.
 2. With Anki open, run `.venv/bin/python tools/q1_probe.py` in a terminal.
 3. If step 2 printed `Q1 OK`, run it again inside Claude Code in `this repository`, with `"Bash(.venv/bin/python tools/q1_probe.py)"` added to `permissions.allow` in `.claude/settings.local.json`, under auto mode.
-4. Write both results under `## Q-1 result` in `docs/decisions.md`.
+4. Write both results under `## Q-1 result` in `docs/development/history/decisions.md`.
 5. If both pass, a later phase builds `--direct` writing. Otherwise writes go through `mcp__anki__add_notes`.
 6. Then run `bash .codex/tools/freeze_contract.sh` and commit.
 

@@ -25,9 +25,9 @@ Packets that give each reviewer everything and nothing more, and one command tha
 
 ## Read first
 
-- `docs/anki-v2-trd.md` T-7, T-8, D-9, D-10, D-11, C-3, C-7, C-8
-- `docs/design-spec.md` §3.6, §4.1 (`packets`, `apply` rows), §5 (round counter, note status)
-- `docs/test-contract.md`: the Phase 4 table
+- `docs/development/specs/legacy/anki-v2-trd.md` T-7, T-8, D-9, D-10, D-11, C-3, C-7, C-8
+- `docs/development/specs/legacy/design-spec.md` §3.6, §4.1 (`packets`, `apply` rows), §5 (round counter, note status)
+- `docs/development/specs/legacy/test-contract.md`: the Phase 4 table
 - **Source for the templates:** the current v1 skill `.claude/skills/anki/SKILL.md`. Its sections "Maintainer brief", "Rubric — the maintainer, per note", "Rubric — the maintainer, the set", "Report format — the maintainer", "Student brief", "Rubric — the student" and "Report format — the student" are what you port.
 
 ## Build

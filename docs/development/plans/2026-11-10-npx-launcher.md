@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12+ (`mcp`, `pydantic`, `platformdirs`, `filelock`), Node 18+ (`node:test`, no runtime dependencies), `uv`, GitHub Actions.
 
-**Spec:** `docs/superpowers/specs/2026-11-10-npx-launcher-design.md`
+**Spec:** `docs/development/specs/2026-11-10-npx-launcher-design.md`
 
 ## Global Constraints
 
@@ -65,7 +65,7 @@
 
 **Files:**
 - Create: `scripts/check_privacy.py`, `tests/unit/test_privacy_check.py`
-- Modify: `.gitignore`, `docs/superpowers/specs/2026-11-07-ankiplusmcp-design.md:62`, `docs/phase4-review.md:43,76`
+- Modify: `.gitignore`, `docs/development/specs/2026-11-07-ankiplusmcp-design.md:62`, `docs/development/history/phase4-review.md:43,76`
 - Delete: `BUNDLE.txt`
 
 **Interfaces:**

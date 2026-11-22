@@ -87,8 +87,8 @@ Design:
   git-ignored. The legacy tree (`.claude/`, `.codex/`, `.agents/`, `prompts/`)
   stays where the tests expect it. Sorting product from workspace is piece 4.
 - **Privacy sweep before the first commit.** Known leaks: a home-directory path
-  with a person's name in `docs/superpowers/specs/2026-11-07-ankiplusmcp-design.md`
-  (line 62) and `docs/phase4-review.md` (lines 43 and 76). Replace with
+  with a person's name in `docs/development/specs/2026-11-07-ankiplusmcp-design.md`
+  (line 62) and `docs/development/history/phase4-review.md` (lines 43 and 76). Replace with
   placeholders. Add a CI check that fails on `/Users/<name>/`, `/home/<name>/`
   and email addresses in tracked files.
 - **Remove stale bundle files.** `BUNDLE.txt` describes a snapshot that no

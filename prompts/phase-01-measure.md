@@ -22,11 +22,11 @@
 
 ## Read first
 
-- `docs/anki-v2-brief.md` §6 (the waste-check table)
-- `docs/anki-v2-trd.md` T-13
-- `docs/design-spec.md` §3.9, §3.11, §7 (prices, lean workspace)
+- `docs/development/specs/legacy/anki-v2-brief.md` §6 (the waste-check table)
+- `docs/development/specs/legacy/anki-v2-trd.md` T-13
+- `docs/development/specs/legacy/design-spec.md` §3.9, §3.11, §7 (prices, lean workspace)
 - `$claude-code-runtime`: "Session transcripts" and its L006 baseline list
-- `docs/test-contract.md`: the Phase 1 table
+- `docs/development/specs/legacy/test-contract.md`: the Phase 1 table
 
 ## Build
 
@@ -39,7 +39,7 @@
 4. **Lean workspace:**
    - Read the L006 transcript's attachment rows (`mcp_instructions_delta`, `deferred_tools_delta`, `skill_listing`, `agent_listing_delta`) to list what loaded.
    - Write the lean keys into `this repository/.claude/settings.json`, keeping every existing key.
-   - Write `docs/lean-workspace.md` listing what only user-level settings can remove, with the exact files and lines for the owner.
+   - Write `docs/development/history/lean-workspace.md` listing what only user-level settings can remove, with the exact files and lines for the owner.
 
 Write the Phase 1 contract tests first (`tests/contract/test_p1_meter.py`, `test_p1_workspace.py`), show red, then implement.
 
@@ -70,8 +70,8 @@ Then, by hand:
 
 1. Fill in `claude-sonnet-5-5` prices in `src/cards/meter/prices.toml` from Anthropic's pricing page.
 2. Open a fresh Claude Code session in `this repository`, say "hi", close it.
-3. Run `.venv/bin/cards meter --latest this repository --out /tmp/m`. Record its first-call context in `docs/decisions.md` (`char_fr25_first_call_drop`: ≥ 10k below 79k).
-4. Do the user-level steps in `docs/lean-workspace.md` that you're happy with.
+3. Run `.venv/bin/cards meter --latest this repository --out /tmp/m`. Record its first-call context in `docs/development/history/decisions.md` (`char_fr25_first_call_drop`: ≥ 10k below 79k).
+4. Do the user-level steps in `docs/development/history/lean-workspace.md` that you're happy with.
 5. Freeze and commit.
 
 ## Stop

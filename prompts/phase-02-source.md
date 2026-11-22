@@ -27,9 +27,9 @@ From a lecture PDF (or a text file), produce, with zero model tokens:
 
 ## Read first
 
-- `docs/anki-v2-trd.md` T-2, T-3, T-4
-- `docs/design-spec.md` §1 (D-1), §3.2, §3.3, §4.1 (`extract`, `source`, `target` rows), §6
-- `docs/test-contract.md`: the Phase 2 table
+- `docs/development/specs/legacy/anki-v2-trd.md` T-2, T-3, T-4
+- `docs/development/specs/legacy/design-spec.md` §1 (D-1), §3.2, §3.3, §4.1 (`extract`, `source`, `target` rows), §6
+- `docs/development/specs/legacy/test-contract.md`: the Phase 2 table
 - `$cards-cli-conventions` ("Porting v1 scripts")
 - v1 code to port: `.claude/skills/anki/scripts/deck_name.py`, `extract_figures.py`, `ocr_regions.py`. Keep the measured OCR recipe.
 

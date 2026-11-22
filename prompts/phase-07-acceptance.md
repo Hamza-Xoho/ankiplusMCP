@@ -20,7 +20,7 @@ This phase is mostly yours. Codex threads are used only to fix a failure, one th
 | SC-6 | No Anki write error in the session. The deck was created in P1. |
 | SC-8 | The transcript shows `anki-maintainer` and `anki-student` and no fork |
 
-Note the usage line from the report next to the v1 baseline (≈$9 API-equivalent, 76 calls, peak 166k) in `docs/decisions.md`.
+Note the usage line from the report next to the v1 baseline (≈$9 API-equivalent, 76 calls, peak 166k) in `docs/development/history/decisions.md`.
 
 ## Run 2: resume (SC-7)
 

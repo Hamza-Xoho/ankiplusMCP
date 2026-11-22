@@ -10,11 +10,11 @@ Codex built phases 0–6. On this Mac `bash .codex/tools/gate.sh 6` passes (348 
 - `Bash(.venv/bin/cards:*)` is allowed.
 - `.venv` is a fresh Mac venv.
 
-Read `AGENTS.md`, `docs/test-contract.md` (skim) and `prompts/phase-06-runtime-skill.md` and `prompts/phase-07-acceptance.md` before starting. Use a task list.
+Read `AGENTS.md`, `docs/development/specs/legacy/test-contract.md` (skim) and `prompts/phase-06-runtime-skill.md` and `prompts/phase-07-acceptance.md` before starting. Use a task list.
 
 ## Rules (apply throughout)
 
-1. **Frozen files.** Never edit `tests/contract/**`, `docs/test-contract.md`, `tests/fixtures/**` or `.codex/**`. Code fixes go in `src/` with a new test in `tests/unit/` written first. After any code change, `bash .codex/tools/gate.sh 6` must pass before you commit.
+1. **Frozen files.** Never edit `tests/contract/**`, `docs/development/specs/legacy/test-contract.md`, `tests/fixtures/**` or `.codex/**`. Code fixes go in `src/` with a new test in `tests/unit/` written first. After any code change, `bash .codex/tools/gate.sh 6` must pass before you commit.
 2. **Private material.**
    - Never commit `tests/fixtures/private/`, `builds/` or anything containing the lecture PDFs or session logs.
    - Before every commit, run `git diff --cached --name-only | grep -E 'private|^builds/|\.pdf$|\.zip$'`. It must print nothing.
@@ -54,10 +54,10 @@ Read `AGENTS.md`, `docs/test-contract.md` (skim) and `prompts/phase-06-runtime-s
 
 ## Part 2: live checks in this session
 
-This session started in this folder, so its hooks and the `anki` MCP server are live. Record each result, with the exact block message where there is one, in `docs/phase6-runtime.md` under a new `## Live checks (Claude Code)` heading.
+This session started in this folder, so its hooks and the `anki` MCP server are live. Record each result, with the exact block message where there is one, in `docs/development/history/phase6-runtime.md` under a new `## Live checks (Claude Code)` heading.
 
 1. **Q-1.**
-   - Run `.venv/bin/python tools/q1_probe.py` and write its output under `## Q-1 result` in `docs/decisions.md`.
+   - Run `.venv/bin/python tools/q1_probe.py` and write its output under `## Q-1 result` in `docs/development/history/decisions.md`.
    - Whatever it says, writes stay on `mcp__anki__add_notes`. Don't build `--direct`.
 2. **The hook checks** from the phase-06 gate. Each one must be blocked by the hook, not by a permission prompt:
    1. Run `.venv/bin/cards state init "tests/fixtures/private/MED241_L006_2026-09-13_endoplasmic-reticulum-mitochondria-and-golgi-apparatus.pdf"`, then try to Read that PDF with the Read tool. It must be blocked with the `cards source` message.
@@ -97,7 +97,7 @@ env -u CLAUDECODE claude -p "/anki2 <absolute path to PDF>" --session-id "$ID" \
   - **SC-6:** no Anki write error; the deck was created in P1.
   - **SC-8:** the transcript shows `anki-maintainer` and `anki-student` and no fork. This also covers the phase-04 manual check.
   - **The phase-01 check:** the first-call context, which should be at least 10k below 79,270.
-- Write the usage line next to the v1 baseline (≈ $9 API-equivalent, 76 calls, peak 166k context) in `docs/decisions.md`.
+- Write the usage line next to the v1 baseline (≈ $9 API-equivalent, 76 calls, peak 166k context) in `docs/development/history/decisions.md`.
 - **If a check fails:**
   - Find the cause in `src/` or the skill files, and fix it under the rules (unit test first, gate 6).
   - Then commit and re-run.

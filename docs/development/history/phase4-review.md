@@ -94,7 +94,7 @@ Write only JSONL to /home/<name>/projects/anki-v2/builds/phase4-l006/review/roun
 - `tests/contract/test_p4_review.py`
 - `tests/unit/test_review_edges.py`
 - `tests/fixtures/reports/{fix,reject,conflict,css-pattern,malformed}/{maintainer,student}.jsonl`
-- `README.md`, `docs/phase4-review.md`
+- `README.md`, `docs/development/history/phase4-review.md`
 
 ## Manual handoff
 

@@ -200,6 +200,7 @@ and rendering operations return jobs; the assistant checks `get_job` for results
 
 ## Configuration and help
 
+- [Documentation index](docs/README.md): current public guides, legacy usage and development records, grouped by audience.
 - [Worked study workflow](docs/study-workflow.md): reuse existing cards, draft gaps, improve backs, review and approve the handoff to Anki.
 - [Setup and troubleshooting](docs/setup.md): host registration, browser choice, source folders, workspace location and unattended commands.
 - [Profiles](docs/setup.md#profiles): standard Anki `Cloze` defaults or the optional `ColdRecall Cloze` conventions.
@@ -234,8 +235,8 @@ legacy workflow.
 
 AnkiPlus grew out of [Lecture2Cards](https://github.com/Hamza-Xoho/Lecture2Cards).
 The original `cards` CLI and `/ankiv2` workflow remain available, with their
-original gate rules. See the [legacy guide](docs/legacy-lecture2cards.md),
-[legacy architecture](docs/ARCHITECTURE.md) and
+original gate rules. See the [legacy guide](docs/legacy/README.md),
+[legacy architecture](docs/legacy/architecture.md) and
 [capability mapping](docs/capabilities.md). Those mandatory pipeline rules do not
 apply to the independent AnkiPlus tools.
 

@@ -2,11 +2,11 @@
 
 > This document describes the original `cards` CLI and `/ankiv2` workflow.
 > Its mandatory pipeline, reviewer and gate rules do not apply to the independent
-> AnkiPlus MCP toolkit. See the [AnkiPlus developer guide](developer-guide.md)
+> AnkiPlus MCP toolkit. See the [AnkiPlus developer guide](../developer-guide.md)
 > for the current MCP architecture. The historical design is retained below.
 
 This document is for people who want to change Lecture2Cards or judge whether
-its design is sound. For using it, read the [README](../README.md).
+its design is sound. For using it, read the [legacy usage guide](README.md).
 
 ## 1. The idea in one paragraph
 
@@ -83,7 +83,7 @@ no direct-write code path in the CLI, so the CLI has no network dependency.
 | `tests/unit/`, `tests/contract/` | Tests. See section 10. |
 | `docs/` | Requirements, design spec, test contract, phase history and decisions. |
 
-Dependency direction is documented in [`design-spec.md`](design-spec.md) §2.
+Dependency direction is documented in [`design-spec.md`](../development/specs/legacy/design-spec.md) §2.
 `common` depends on nothing. Feature modules depend on `common` and on each
 other only through the documented outputs (files), not through imports of
 internal state.
@@ -313,7 +313,7 @@ packaged copies match the skill copies.
 - **Unit tests** (`tests/unit/`): helpers, packets and allowlists, apply
   validation, packaging sync, state init, and the cases that produced past bugs.
 - **Contract tests** (`tests/contract/`): one file per phase, named in
-  [`test-contract.md`](test-contract.md). They run the real CLI. The files listed in
+  [`test-contract.md`](../development/specs/legacy/test-contract.md). They run the real CLI. The files listed in
   `.codex/contract.sha256` are frozen: a test can only change by re-freezing it by
   hand, after the requirement changes in the docs.
 - **Private fixtures**: tests that need a lecture PDF use files in
@@ -325,7 +325,7 @@ packaged copies match the skill copies.
 
 ## 13. Known gaps
 
-These are recorded in [`decisions.md`](decisions.md) and are not hidden by the
+These are recorded in [`decisions.md`](../development/history/decisions.md) and are not hidden by the
 tests.
 
 - **Performance.** Cold extraction of a synthetic 12-page PDF takes 52.4 s on

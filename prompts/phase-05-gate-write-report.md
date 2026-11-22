@@ -5,7 +5,7 @@
 ## Not in this phase
 
 - **No human approval step anywhere** (ADR-9). Equally, nothing may skip the automatic gate: no flag, env var or config key.
-- Build `write/direct.py` **only if** `docs/decisions.md` → "Q-1 result" says both probes passed. Otherwise don't create the file at all.
+- Build `write/direct.py` **only if** `docs/development/history/decisions.md` → "Q-1 result" says both probes passed. Otherwise don't create the file at all.
 - No SKILL.md or runtime hooks yet (Phase 6).
 
 ## Goal
@@ -24,11 +24,11 @@ A build that passed review is written exactly as reviewed, or not at all. The re
 
 ## Read first
 
-- `docs/anki-v2-trd.md` T-9, T-10, T-12, D-12, D-13, D-14
-- `docs/design-spec.md` §3.7, §3.8, §3.9, §4.1 (`gate`, `write`, `report` rows), §5 (gate status, staleness), §6 (refusals)
-- `docs/decisions.md` (Q-1 result)
+- `docs/development/specs/legacy/anki-v2-trd.md` T-9, T-10, T-12, D-12, D-13, D-14
+- `docs/development/specs/legacy/design-spec.md` §3.7, §3.8, §3.9, §4.1 (`gate`, `write`, `report` rows), §5 (gate status, staleness), §6 (refusals)
+- `docs/development/history/decisions.md` (Q-1 result)
 - `$claude-code-runtime`: the AnkiMCP section, for the `add_notes` argument shape and limits
-- `docs/test-contract.md`: the Phase 5 table
+- `docs/development/specs/legacy/test-contract.md`: the Phase 5 table
 
 ## Build
 

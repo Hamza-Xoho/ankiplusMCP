@@ -47,7 +47,7 @@ With Anki running, the separate manual access spike is:
 ```
 
 Run it first in a terminal, then in the authorized Claude Code environment as
-specified by the phase prompt. Record both results in `docs/decisions.md`.
+specified by the phase prompt. Record both results in `docs/development/history/decisions.md`.
 The probe is outside the offline package and is not called by `cards` or tests.
 Only its reply parser is tested offline. No live Q-1 result is claimed.
 
@@ -71,7 +71,7 @@ Exit 0 means all waste checks pass, 1 means findings, and 2 means invalid input.
 Details go to `cost.json` and `cost.md` in `--out`. Sonnet 5.5 costs stay unknown
 until the owner fills `src/cards/meter/prices.toml` at the manual gate.
 
-[Lean workspace notes](docs/lean-workspace.md) list the loaded L006 environment,
+[Lean workspace notes](lean-workspace.md) list the loaded L006 environment,
 project settings changes, and remaining user-level steps. The fresh-session
 context reduction has not been measured on this host. This checkout stands in
 for the owner’s Mac Cards workspace; user-level configuration files were not supplied.
@@ -138,7 +138,7 @@ missing. It is not part of the automated behavioral contracts.
 It writes `checks/check.json`: located schema blockers S01–S09, style findings
 L01–L13, uncovered slides/objectives and note/card/tier/group counts. Findings
 exit 1; invalid JSON exits 2. Clean output is `OK` and one stats line. The schema
-code mapping is recorded in `docs/decisions.md`.
+code mapping is recorded in `docs/development/history/decisions.md`.
 
 `render` uses the unchanged bundled ColdRecall template/CSS by default, or a
 `model/{front.html,back.html,style.css}` snapshot within the build. Install the
@@ -200,7 +200,7 @@ and add `#ColdRecall::Review_unresolved`; suspension belongs to Phase 5.
 An unchanged apply rerun is idempotent; changed reports or drafts after application
 require deliberate resolution in a new round, preserving the existing backup/log.
 
-The Phase 4 handoff is [docs/phase4-review.md](docs/phase4-review.md). Runtime
+The Phase 4 handoff is [docs/development/history/phase4-review.md](phase4-review.md). Runtime
 reviewers, Phase 5, the gate and the contract freeze are not run by this phase.
 
 ### Phase 5: gate, write plan and report
@@ -214,4 +214,4 @@ CLAUDE_SESSION_ID=<current-session-id-or-transcript-path> .venv/bin/cards report
 .venv/bin/python -m pytest -q
 ```
 
-Q-1 has no passing result, so `--direct` is absent. Changed review inputs or drafts require a fresh gate. `write/provenance.json` documents exact native payloads without adding keys to Anki arguments. See [Phase 5 handoff](docs/phase5-write.md) for the L006 demonstration and scratch-profile verification still required.
+Q-1 has no passing result, so `--direct` is absent. Changed review inputs or drafts require a fresh gate. `write/provenance.json` documents exact native payloads without adding keys to Anki arguments. See [Phase 5 handoff](phase5-write.md) for the L006 demonstration and scratch-profile verification still required.
