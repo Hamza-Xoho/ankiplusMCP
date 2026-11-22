@@ -17,3 +17,6 @@ tests/fixtures/private
 reference folders
 
 .artifacts
+node_modules
+*.tgz
+.claude/worktrees

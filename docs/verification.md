@@ -1,5 +1,9 @@
 # AnkiPlus MCP verification
 
+> Historical snapshot: the results below describe 2026-11-07, not the current
+> checkout or release. For current commands and verification scope, see the
+> [developer guide](developer-guide.md#checks-and-verification).
+
 Verified locally on 2026-11-07, Python 3.14/Linux. Source branch:
 `feat/ankiplusmcp`, based on upstream `5bb2530`; implementation is uncommitted
 because Git author identity is not configured. Container builds are labelled

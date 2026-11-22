@@ -1,4 +1,9 @@
-# Architecture and design rationale
+# Legacy Lecture2Cards architecture and design rationale
+
+> This document describes the original `cards` CLI and `/ankiv2` workflow.
+> Its mandatory pipeline, reviewer and gate rules do not apply to the independent
+> AnkiPlus MCP toolkit. See the [AnkiPlus developer guide](developer-guide.md)
+> for the current MCP architecture. The historical design is retained below.
 
 This document is for people who want to change Lecture2Cards or judge whether
 its design is sound. For using it, read the [README](../README.md).
